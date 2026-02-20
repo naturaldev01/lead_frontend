@@ -118,8 +118,8 @@ export const api = {
 export interface DashboardStats {
   totalSpend: number;
   totalLeads: number;
-  lastSpendSync: string;
-  lastLeadsSync: string;
+  lastSpendSync: string | null;
+  lastLeadsSync: string | null;
 }
 
 export interface Campaign {
