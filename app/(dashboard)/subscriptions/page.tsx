@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, CheckCircle2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -13,60 +13,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-interface Subscription {
-  id: string;
-  accountName: string;
-  accountId: string;
-  status: "subscribed" | "not_subscribed" | "error";
-  fields: string;
-  lastAttempt: string | null;
-  lastSuccess: string | null;
-  lastError: string | null;
-}
-
-const mockSubscriptions: Subscription[] = [
-  {
-    id: "1",
-    accountName: "Natural Care",
-    accountId: "act_447318237318335",
-    status: "subscribed",
-    fields: "leadgen,ads,adsets,campaigns",
-    lastAttempt: "14.02.2026 15:20:05",
-    lastSuccess: "14.02.2026 15:20:05",
-    lastError: null,
-  },
-  {
-    id: "2",
-    accountName: "Natural Clinic Turkey",
-    accountId: "act_555680213653953",
-    status: "subscribed",
-    fields: "leadgen,ads,adsets,campaigns",
-    lastAttempt: "15.02.2026 14:20:00",
-    lastSuccess: "15.02.2026 14:20:00",
-    lastError: null,
-  },
-  {
-    id: "3",
-    accountName: "Natural Clinic EU",
-    accountId: "act_795458186742642",
-    status: "subscribed",
-    fields: "leadgen,ads,adsets,campaigns",
-    lastAttempt: "14.02.2026 15:20:07",
-    lastSuccess: "14.02.2026 15:20:07",
-    lastError: null,
-  },
-];
+import { api, Subscription } from "@/lib/api";
 
 export default function SubscriptionsPage() {
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>(mockSubscriptions);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [autoSubscribing, setAutoSubscribing] = useState(false);
+
+  const fetchSubscriptions = useCallback(async () => {
+    try {
+      const data = await api.getSubscriptions();
+      setSubscriptions(data);
+    } catch (error) {
+      console.error("Failed to fetch subscriptions:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSubscriptions();
+  }, [fetchSubscriptions]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const data = await api.refreshSubscriptions();
+      setSubscriptions(data);
+    } catch (error) {
+      console.error("Failed to refresh subscriptions:", error);
     } finally {
       setRefreshing(false);
     }
@@ -75,7 +51,10 @@ export default function SubscriptionsPage() {
   const handleAutoSubscribe = async () => {
     setAutoSubscribing(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await api.autoSubscribe();
+      await fetchSubscriptions();
+    } catch (error) {
+      console.error("Failed to auto-subscribe:", error);
     } finally {
       setAutoSubscribing(false);
     }
@@ -148,7 +127,7 @@ export default function SubscriptionsPage() {
               {subscriptions.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                    No ad accounts found
+                    {loading ? "Loading..." : "No ad accounts found"}
                   </TableCell>
                 </TableRow>
               ) : (

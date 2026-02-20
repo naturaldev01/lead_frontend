@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Link2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,37 +13,44 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AddMappingModal } from "@/components/mappings/add-mapping-modal";
-
-interface MappingRule {
-  sourceField: string;
-  sourceValue: string;
-  targetEntity: string;
-  targetId: string;
-}
-
-interface Mapping {
-  id: string;
-  name: string;
-  rules: MappingRule[];
-  createdAt: string;
-}
+import { api, Mapping, MappingRule } from "@/lib/api";
 
 export default function MappingsPage() {
   const [mappings, setMappings] = useState<Mapping[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const handleAddMapping = (name: string, rules: MappingRule[]) => {
-    const newMapping: Mapping = {
-      id: Date.now().toString(),
-      name,
-      rules,
-      createdAt: new Date().toISOString(),
-    };
-    setMappings([...mappings, newMapping]);
+  const fetchMappings = useCallback(async () => {
+    try {
+      const data = await api.getMappings();
+      setMappings(data);
+    } catch (error) {
+      console.error("Failed to fetch mappings:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMappings();
+  }, [fetchMappings]);
+
+  const handleAddMapping = async (name: string, rules: MappingRule[]) => {
+    try {
+      await api.createMapping({ name, rules });
+      await fetchMappings();
+    } catch (error) {
+      console.error("Failed to create mapping:", error);
+    }
   };
 
-  const handleDeleteMapping = (id: string) => {
-    setMappings(mappings.filter((m) => m.id !== id));
+  const handleDeleteMapping = async (id: string) => {
+    try {
+      await api.deleteMapping(id);
+      setMappings(mappings.filter((m) => m.id !== id));
+    } catch (error) {
+      console.error("Failed to delete mapping:", error);
+    }
   };
 
   return (
@@ -74,7 +81,7 @@ export default function MappingsPage() {
                 <Link2 className="h-8 w-8 text-gray-400" />
               </div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
-                No mappings configured
+                {loading ? "Loading..." : "No mappings configured"}
               </h3>
               <p className="text-gray-500 dark:text-gray-400 mb-4 max-w-sm">
                 Add attribution mappings to link Zoho events to Meta campaigns

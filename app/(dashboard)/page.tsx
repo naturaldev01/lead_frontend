@@ -16,22 +16,7 @@ import { StatsCards } from "@/components/dashboard/stats-cards";
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
 import { CampaignsTable } from "@/components/dashboard/campaigns-table";
 import { Badge } from "@/components/ui/badge";
-
-interface DashboardStats {
-  totalSpend: number;
-  totalLeads: number;
-  lastSpendSync: string | null;
-  lastLeadsSync: string | null;
-}
-
-interface Campaign {
-  id: string;
-  name: string;
-  adAccountName: string;
-  type: string;
-  spendUsd: number;
-  leads: number;
-}
+import { api, DashboardStats, Campaign } from "@/lib/api";
 
 export default function DashboardPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -42,87 +27,82 @@ export default function DashboardPage() {
   const [objectiveFilter, setObjectiveFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [stats, setStats] = useState<DashboardStats>({
-    totalSpend: 119870,
-    totalLeads: 21475,
+    totalSpend: 0,
+    totalLeads: 0,
     lastSpendSync: null,
     lastLeadsSync: null,
   });
-  const [campaigns, setCampaigns] = useState<Campaign[]>([
-    {
-      id: "1",
-      name: "FB/BG/EN/Lead",
-      adAccountName: "Natural Clinic EU",
-      type: "Lead",
-      spendUsd: 38711.19,
-      leads: 5461,
-    },
-    {
-      id: "2",
-      name: "FB/PR/Post Promotion WP",
-      adAccountName: "Natural Clinic EU",
-      type: "Engagement",
-      spendUsd: 7580.8,
-      leads: 6,
-    },
-    {
-      id: "3",
-      name: "FB/RT/Post Promotion WP",
-      adAccountName: "Natural Clinic EU",
-      type: "Engagement",
-      spendUsd: 6926.45,
-      leads: 6,
-    },
-    {
-      id: "4",
-      name: "FB/BG/IT/Lead",
-      adAccountName: "Natural Clinic EU",
-      type: "Lead",
-      spendUsd: 6883.89,
-      leads: 1396,
-    },
-    {
-      id: "5",
-      name: "LG-Dental-SP-CBO",
-      adAccountName: "Natural Clinic Turkey",
-      type: "Lead",
-      spendUsd: 6786.13,
-      leads: 1778,
-    },
-    {
-      id: "6",
-      name: "Aesthetics-IT-001",
-      adAccountName: "Natural Clinic Turkey",
-      type: "Lead",
-      spendUsd: 6849.37,
-      leads: 1346,
-    },
-    {
-      id: "7",
-      name: "LG-Dental-EN-UK-CBO",
-      adAccountName: "Natural Clinic Turkey",
-      type: "Lead",
-      spendUsd: 4881.76,
-      leads: 1896,
-    },
-  ]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [lastSyncTime, setLastSyncTime] = useState<{ spend: string; leads: string }>({
-    spend: "35 minutes ago",
-    leads: "3 minutes ago",
+    spend: "-",
+    leads: "-",
   });
+
+  const fetchData = useCallback(async () => {
+    if (!dateRange?.from || !dateRange?.to) return;
+
+    try {
+      const startDate = format(dateRange.from, "yyyy-MM-dd");
+      const endDate = format(dateRange.to, "yyyy-MM-dd");
+
+      const [statsData, campaignsData] = await Promise.all([
+        api.getDashboardStats({
+          startDate,
+          endDate,
+          accountId: accountFilter !== "all" ? accountFilter : undefined,
+          objective: objectiveFilter !== "all" ? objectiveFilter : undefined,
+        }),
+        api.getCampaigns({
+          startDate,
+          endDate,
+          accountId: accountFilter !== "all" ? accountFilter : undefined,
+          search: searchQuery || undefined,
+        }),
+      ]);
+
+      setStats(statsData);
+      setCampaigns(campaignsData);
+
+      if (statsData.lastSpendSync) {
+        setLastSyncTime((prev) => ({
+          ...prev,
+          spend: formatRelativeTime(statsData.lastSpendSync),
+        }));
+      }
+      if (statsData.lastLeadsSync) {
+        setLastSyncTime((prev) => ({
+          ...prev,
+          leads: formatRelativeTime(statsData.lastLeadsSync),
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to fetch dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [dateRange, accountFilter, objectiveFilter, searchQuery]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleSync = useCallback(async () => {
     setSyncing(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await api.syncMeta();
+      await fetchData();
       setLastSyncTime({
         spend: "Just now",
         leads: "Just now",
       });
+    } catch (error) {
+      console.error("Sync failed:", error);
     } finally {
       setSyncing(false);
     }
-  }, []);
+  }, [fetchData]);
 
   const filteredCampaigns = campaigns.filter((campaign) => {
     if (searchQuery && !campaign.name.toLowerCase().includes(searchQuery.toLowerCase())) {
@@ -208,4 +188,22 @@ export default function DashboardPage() {
       />
     </div>
   );
+}
+
+function formatRelativeTime(dateString: string | null): string {
+  if (!dateString) return "-";
+  
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins} minutes ago`;
+  
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} days ago`;
 }
