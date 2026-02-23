@@ -23,14 +23,14 @@ async function fetchAPI<T>(
 export const api = {
   // Dashboard
   getDashboardStats: (params: {
-    startDate: string;
-    endDate: string;
+    startDate?: string;
+    endDate?: string;
     accountId?: string;
     objective?: string;
   }) => {
     const searchParams = new URLSearchParams({
-      startDate: params.startDate,
-      endDate: params.endDate,
+      ...(params.startDate && { startDate: params.startDate }),
+      ...(params.endDate && { endDate: params.endDate }),
       ...(params.accountId && { accountId: params.accountId }),
       ...(params.objective && { objective: params.objective }),
     });
@@ -38,18 +38,26 @@ export const api = {
   },
 
   getCampaigns: (params: {
-    startDate: string;
-    endDate: string;
+    startDate?: string;
+    endDate?: string;
     accountId?: string;
     search?: string;
   }) => {
     const searchParams = new URLSearchParams({
-      startDate: params.startDate,
-      endDate: params.endDate,
+      ...(params.startDate && { startDate: params.startDate }),
+      ...(params.endDate && { endDate: params.endDate }),
       ...(params.accountId && { accountId: params.accountId }),
       ...(params.search && { search: params.search }),
     });
     return fetchAPI<Campaign[]>(`/api/campaigns?${searchParams}`);
+  },
+
+  getCampaignHierarchy: (params?: { accountId?: string; search?: string }) => {
+    const searchParams = new URLSearchParams({
+      ...(params?.accountId && { accountId: params.accountId }),
+      ...(params?.search && { search: params.search }),
+    });
+    return fetchAPI<CampaignHierarchy[]>(`/api/campaigns/hierarchy?${searchParams}`);
   },
 
   syncMeta: () => fetchAPI<{ success: boolean }>("/api/meta/sync", { method: "POST" }),
@@ -130,6 +138,41 @@ export interface Campaign {
   type: string;
   spendUsd: number;
   leads: number;
+}
+
+export interface Ad {
+  id: string;
+  adId: string;
+  name: string;
+  status: string;
+  spendUsd: number;
+  leads: number;
+}
+
+export interface AdSet {
+  id: string;
+  adSetId: string;
+  name: string;
+  status: string;
+  optimizationGoal: string;
+  spendUsd: number;
+  leads: number;
+  ads: Ad[];
+}
+
+export interface CampaignHierarchy {
+  id: string;
+  campaignId: string;
+  name: string;
+  adAccountId: string;
+  adAccountName: string;
+  type: string;
+  status: string;
+  spendUsd: number;
+  leads: number;
+  formLeads: number;
+  insightsLeads: number;
+  adSets: AdSet[];
 }
 
 export interface Lead {

@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { format } from "date-fns";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { format, subDays, differenceInDays, startOfDay } from "date-fns";
+import { Calendar as CalendarIcon, Infinity } from "lucide-react";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -16,44 +16,134 @@ import {
 interface DateRangePickerProps {
   date: DateRange | undefined;
   onDateChange: (date: DateRange | undefined) => void;
+  isAllTime?: boolean;
+  onAllTimeChange?: (isAllTime: boolean) => void;
 }
 
-export function DateRangePicker({ date, onDateChange }: DateRangePickerProps) {
+const PRESET_RANGES = [
+  { label: "30 Days", days: 30 },
+  { label: "60 Days", days: 60 },
+  { label: "90 Days", days: 90 },
+  { label: "120 Days", days: 120 },
+  { label: "150 Days", days: 150 },
+  { label: "180 Days", days: 180 },
+];
+
+function getMatchingPreset(date: DateRange | undefined): number | null {
+  if (!date?.from || !date?.to) return null;
+  
+  const today = startOfDay(new Date());
+  const toDate = startOfDay(date.to);
+  const fromDate = startOfDay(date.from);
+  
+  // Check if 'to' date is today (within 1 day tolerance)
+  const daysFromToday = Math.abs(differenceInDays(toDate, today));
+  if (daysFromToday > 1) return null;
+  
+  // Calculate the range in days
+  const rangeDays = differenceInDays(toDate, fromDate);
+  
+  // Check if it matches any preset (with 1 day tolerance)
+  for (const preset of PRESET_RANGES) {
+    if (Math.abs(rangeDays - preset.days) <= 1) {
+      return preset.days;
+    }
+  }
+  
+  return null;
+}
+
+export function DateRangePicker({ date, onDateChange, isAllTime, onAllTimeChange }: DateRangePickerProps) {
+  const activePreset = React.useMemo(() => {
+    if (isAllTime) return null;
+    return getMatchingPreset(date);
+  }, [date, isAllTime]);
+
+  const handleAllTimeClick = () => {
+    if (onAllTimeChange) {
+      onAllTimeChange(true);
+    }
+  };
+
+  const handlePresetClick = (days: number) => {
+    if (onAllTimeChange) {
+      onAllTimeChange(false);
+    }
+    const today = new Date();
+    const from = subDays(today, days);
+    onDateChange({ from, to: today });
+  };
+
+  const handleDateSelect = (newDate: DateRange | undefined) => {
+    if (onAllTimeChange) {
+      onAllTimeChange(false);
+    }
+    onDateChange(newDate);
+  };
+
+  const isCustomRange = !isAllTime && activePreset === null && date?.from;
+
   return (
-    <Popover>
-      <PopoverTrigger asChild>
+    <div className="flex flex-wrap items-center gap-2">
+      {PRESET_RANGES.map((preset) => (
         <Button
-          variant="outline"
-          className={cn(
-            "w-[280px] justify-start text-left font-normal",
-            !date && "text-muted-foreground"
-          )}
+          key={preset.days}
+          variant={activePreset === preset.days ? "default" : "outline"}
+          size="sm"
+          onClick={() => handlePresetClick(preset.days)}
+          className="whitespace-nowrap"
         >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {date?.from ? (
-            date.to ? (
-              <>
-                {format(date.from, "LLL dd, yyyy")} -{" "}
-                {format(date.to, "LLL dd, yyyy")}
-              </>
-            ) : (
-              format(date.from, "LLL dd, yyyy")
-            )
-          ) : (
-            <span>Pick a date range</span>
-          )}
+          {preset.label}
         </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          initialFocus
-          mode="range"
-          defaultMonth={date?.from}
-          selected={date}
-          onSelect={onDateChange}
-          numberOfMonths={2}
-        />
-      </PopoverContent>
-    </Popover>
+      ))}
+      
+      <Button
+        variant={isAllTime ? "default" : "outline"}
+        size="sm"
+        onClick={handleAllTimeClick}
+        className="whitespace-nowrap"
+      >
+        <Infinity className="mr-1 h-4 w-4" />
+        All Time
+      </Button>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant={isCustomRange ? "default" : "outline"}
+            size="sm"
+            className={cn(
+              "w-[240px] justify-start text-left font-normal",
+              !date && !isAllTime && "text-muted-foreground"
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {isAllTime ? (
+              <span className="text-muted-foreground">Custom range</span>
+            ) : date?.from ? (
+              date.to ? (
+                <>
+                  {format(date.from, "MMM dd")} - {format(date.to, "MMM dd, yyyy")}
+                </>
+              ) : (
+                format(date.from, "LLL dd, yyyy")
+              )
+            ) : (
+              <span>Custom range</span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            initialFocus
+            mode="range"
+            defaultMonth={date?.from}
+            selected={isAllTime ? undefined : date}
+            onSelect={handleDateSelect}
+            numberOfMonths={2}
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }

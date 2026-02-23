@@ -15,6 +15,7 @@ import { Users } from "lucide-react";
 interface Campaign {
   id: string;
   name: string;
+  adAccountId: string;
   adAccountName: string;
   type: string;
   spendUsd: number;
@@ -78,7 +79,7 @@ export function CampaignsTable({
                   <TableCell>
                     <div>
                       <p>{campaign.adAccountName}</p>
-                      <p className="text-xs text-gray-500">act_xxxxx</p>
+                      <p className="text-xs text-gray-500">act_{campaign.adAccountId}</p>
                     </div>
                   </TableCell>
                   <TableCell>

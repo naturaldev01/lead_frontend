@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { format, subDays } from "date-fns";
 import { DateRange } from "react-day-picker";
-import { RefreshCw, Circle } from "lucide-react";
+import { RefreshCw, Circle, LayoutList, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -15,17 +15,20 @@ import {
 import { StatsCards } from "@/components/dashboard/stats-cards";
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
 import { CampaignsTable } from "@/components/dashboard/campaigns-table";
+import { CampaignHierarchyTable } from "@/components/dashboard/campaign-hierarchy-table";
 import { Badge } from "@/components/ui/badge";
-import { api, DashboardStats, Campaign } from "@/lib/api";
+import { api, DashboardStats, Campaign, CampaignHierarchy } from "@/lib/api";
 
 export default function DashboardPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 30),
+    from: subDays(new Date(), 365),
     to: new Date(),
   });
+  const [isAllTime, setIsAllTime] = useState<boolean>(true);
   const [accountFilter, setAccountFilter] = useState<string>("all");
   const [objectiveFilter, setObjectiveFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"flat" | "hierarchy">("hierarchy");
   const [stats, setStats] = useState<DashboardStats>({
     totalSpend: 0,
     totalLeads: 0,
@@ -33,6 +36,7 @@ export default function DashboardPage() {
     lastLeadsSync: null,
   });
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [campaignHierarchy, setCampaignHierarchy] = useState<CampaignHierarchy[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [lastSyncTime, setLastSyncTime] = useState<{ spend: string; leads: string }>({
@@ -41,13 +45,13 @@ export default function DashboardPage() {
   });
 
   const fetchData = useCallback(async () => {
-    if (!dateRange?.from || !dateRange?.to) return;
+    if (!isAllTime && (!dateRange?.from || !dateRange?.to)) return;
 
     try {
-      const startDate = format(dateRange.from, "yyyy-MM-dd");
-      const endDate = format(dateRange.to, "yyyy-MM-dd");
+      const startDate = isAllTime ? undefined : format(dateRange!.from!, "yyyy-MM-dd");
+      const endDate = isAllTime ? undefined : format(dateRange!.to!, "yyyy-MM-dd");
 
-      const [statsData, campaignsData] = await Promise.all([
+      const [statsData, campaignsData, hierarchyData] = await Promise.all([
         api.getDashboardStats({
           startDate,
           endDate,
@@ -60,10 +64,15 @@ export default function DashboardPage() {
           accountId: accountFilter !== "all" ? accountFilter : undefined,
           search: searchQuery || undefined,
         }),
+        api.getCampaignHierarchy({
+          accountId: accountFilter !== "all" ? accountFilter : undefined,
+          search: searchQuery || undefined,
+        }),
       ]);
 
       setStats(statsData);
       setCampaigns(campaignsData);
+      setCampaignHierarchy(hierarchyData);
 
       if (statsData.lastSpendSync) {
         setLastSyncTime((prev) => ({
@@ -82,7 +91,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, accountFilter, objectiveFilter, searchQuery]);
+  }, [dateRange, isAllTime, accountFilter, objectiveFilter, searchQuery]);
 
   useEffect(() => {
     fetchData();
@@ -108,7 +117,7 @@ export default function DashboardPage() {
     if (searchQuery && !campaign.name.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false;
     }
-    if (accountFilter !== "all" && campaign.adAccountName !== accountFilter) {
+    if (accountFilter !== "all" && campaign.adAccountId !== accountFilter) {
       return false;
     }
     if (objectiveFilter !== "all" && campaign.type !== objectiveFilter) {
@@ -135,17 +144,22 @@ export default function DashboardPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
-        <DateRangePicker date={dateRange} onDateChange={setDateRange} />
+        <DateRangePicker 
+          date={dateRange} 
+          onDateChange={setDateRange}
+          isAllTime={isAllTime}
+          onAllTimeChange={setIsAllTime}
+        />
 
         <Select value={accountFilter} onValueChange={setAccountFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Campaign" />
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Ad Account" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Accounts</SelectItem>
-            <SelectItem value="Natural Clinic EU">Natural Clinic EU</SelectItem>
-            <SelectItem value="Natural Clinic Turkey">Natural Clinic Turkey</SelectItem>
-            <SelectItem value="Natural Care">Natural Care</SelectItem>
+            <SelectItem value="795450186742642">Natural Clinic EU</SelectItem>
+            <SelectItem value="555680213653953">Natural Clinic Turkey</SelectItem>
+            <SelectItem value="447318237318335">Natural Care</SelectItem>
           </SelectContent>
         </Select>
 
@@ -181,11 +195,40 @@ export default function DashboardPage() {
 
       <StatsCards totalSpend={stats.totalSpend} totalLeads={stats.totalLeads} />
 
-      <CampaignsTable
-        campaigns={filteredCampaigns}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-      />
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-sm text-gray-500">View:</span>
+        <Button
+          variant={viewMode === "flat" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setViewMode("flat")}
+        >
+          <LayoutList className="h-4 w-4 mr-1" />
+          Flat
+        </Button>
+        <Button
+          variant={viewMode === "hierarchy" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setViewMode("hierarchy")}
+        >
+          <Layers className="h-4 w-4 mr-1" />
+          Hierarchy
+        </Button>
+      </div>
+
+      {viewMode === "flat" ? (
+        <CampaignsTable
+          campaigns={filteredCampaigns}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+        />
+      ) : (
+        <CampaignHierarchyTable
+          campaigns={campaignHierarchy}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          loading={loading}
+        />
+      )}
     </div>
   );
 }
