@@ -76,7 +76,15 @@ export default function DashboardPage() {
         }),
       ]);
 
-      setStats(statsData);
+      // Calculate totals from hierarchy data to ensure consistency with filters
+      const calculatedTotalSpend = hierarchyData.reduce((sum, c) => sum + (c.spendUsd || 0), 0);
+      const calculatedTotalLeads = hierarchyData.reduce((sum, c) => sum + (c.leads || 0), 0);
+
+      setStats({
+        ...statsData,
+        totalSpend: calculatedTotalSpend,
+        totalLeads: calculatedTotalLeads,
+      });
       setCampaigns(campaignsData);
       setCampaignHierarchy(hierarchyData);
 
