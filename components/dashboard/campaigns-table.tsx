@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Table,
   TableBody,
@@ -10,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Users } from "lucide-react";
+import { Users, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 interface Campaign {
   id: string;
@@ -28,11 +29,49 @@ interface CampaignsTableProps {
   onSearchChange: (query: string) => void;
 }
 
+type SortField = "spend" | "leads" | null;
+type SortDirection = "asc" | "desc";
+
 export function CampaignsTable({
   campaigns,
   searchQuery,
   onSearchChange,
 }: CampaignsTableProps) {
+  const [sortField, setSortField] = useState<SortField>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortDirection === "desc") {
+        setSortDirection("asc");
+      } else {
+        setSortField(null);
+      }
+    } else {
+      setSortField(field);
+      setSortDirection("desc");
+    }
+  };
+
+  const sortedCampaigns = [...campaigns].sort((a, b) => {
+    if (!sortField) return 0;
+    const multiplier = sortDirection === "asc" ? 1 : -1;
+    if (sortField === "spend") {
+      return (a.spendUsd - b.spendUsd) * multiplier;
+    }
+    if (sortField === "leads") {
+      return (a.leads - b.leads) * multiplier;
+    }
+    return 0;
+  });
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    return sortDirection === "asc" 
+      ? <ArrowUp className="h-4 w-4 ml-1" />
+      : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -56,19 +95,35 @@ export function CampaignsTable({
               <TableHead>Name</TableHead>
               <TableHead>Ad Account</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead className="text-right">Spend (USD)</TableHead>
-              <TableHead className="text-right">Leads</TableHead>
+              <TableHead className="text-right">
+                <button
+                  onClick={() => handleSort("spend")}
+                  className="flex items-center justify-end w-full hover:text-gray-900 dark:hover:text-gray-100"
+                >
+                  Spend (USD)
+                  <SortIcon field="spend" />
+                </button>
+              </TableHead>
+              <TableHead className="text-right">
+                <button
+                  onClick={() => handleSort("leads")}
+                  className="flex items-center justify-end w-full hover:text-gray-900 dark:hover:text-gray-100"
+                >
+                  Leads
+                  <SortIcon field="leads" />
+                </button>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {campaigns.length === 0 ? (
+            {sortedCampaigns.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-8 text-gray-500">
                   No campaigns found
                 </TableCell>
               </TableRow>
             ) : (
-              campaigns.map((campaign) => (
+              sortedCampaigns.map((campaign) => (
                 <TableRow key={campaign.id}>
                   <TableCell>
                     <div>

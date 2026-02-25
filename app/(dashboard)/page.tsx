@@ -27,7 +27,6 @@ export default function DashboardPage() {
   });
   const [isAllTime, setIsAllTime] = useState<boolean>(true);
   const [accountFilter, setAccountFilter] = useState<string>("all");
-  const [objectiveFilter, setObjectiveFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"flat" | "hierarchy">("hierarchy");
   const [stats, setStats] = useState<DashboardStats>({
@@ -55,12 +54,11 @@ export default function DashboardPage() {
       const startDate = isAllTime ? undefined : format(dateRange!.from!, "yyyy-MM-dd");
       const endDate = isAllTime ? undefined : format(dateRange!.to!, "yyyy-MM-dd");
 
-      const [statsData, campaignsData, hierarchyData, countriesData] = await Promise.all([
+      const [statsData, campaignsData, hierarchyData] = await Promise.all([
         api.getDashboardStats({
           startDate,
           endDate,
           accountId: accountFilter !== "all" ? accountFilter : undefined,
-          objective: objectiveFilter !== "all" ? objectiveFilter : undefined,
         }),
         api.getCampaigns({
           startDate,
@@ -73,14 +71,14 @@ export default function DashboardPage() {
           search: searchQuery || undefined,
           country: countryFilter || undefined,
           level: levelFilter || undefined,
+          startDate,
+          endDate,
         }),
-        api.getAvailableCountries(),
       ]);
 
       setStats(statsData);
       setCampaigns(campaignsData);
       setCampaignHierarchy(hierarchyData);
-      setAvailableCountries(countriesData);
 
       if (statsData.lastSpendSync) {
         setLastSyncTime((prev) => ({
@@ -99,7 +97,14 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, isAllTime, accountFilter, objectiveFilter, searchQuery, countryFilter, levelFilter]);
+  }, [dateRange, isAllTime, accountFilter, searchQuery, countryFilter, levelFilter]);
+
+  // Load countries once on mount
+  useEffect(() => {
+    api.getAvailableCountries()
+      .then(setAvailableCountries)
+      .catch(() => console.warn("Failed to load countries"));
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -126,9 +131,6 @@ export default function DashboardPage() {
       return false;
     }
     if (accountFilter !== "all" && campaign.adAccountId !== accountFilter) {
-      return false;
-    }
-    if (objectiveFilter !== "all" && campaign.type !== objectiveFilter) {
       return false;
     }
     return true;
@@ -171,17 +173,6 @@ export default function DashboardPage() {
           </SelectContent>
         </Select>
 
-        <Select value={objectiveFilter} onValueChange={setObjectiveFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Objectives" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Objectives</SelectItem>
-            <SelectItem value="Lead">Lead</SelectItem>
-            <SelectItem value="Engagement">Engagement</SelectItem>
-            <SelectItem value="Conversions">Conversions</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="flex items-center gap-4 text-sm">
@@ -247,6 +238,7 @@ export default function DashboardPage() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           loading={loading}
+          levelFilter={levelFilter}
         />
       )}
     </div>

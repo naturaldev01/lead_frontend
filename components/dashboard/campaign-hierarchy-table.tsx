@@ -12,7 +12,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Users, Layers, Target, FileText } from "lucide-react";
+import { ChevronDown, ChevronRight, Users, Layers, Target, FileText, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { CampaignHierarchy, AdSet, Ad } from "@/lib/api";
 
 interface CampaignHierarchyTableProps {
@@ -20,18 +20,56 @@ interface CampaignHierarchyTableProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   loading?: boolean;
+  levelFilter?: string | null;
 }
 
 type ExpandedState = Record<string, boolean>;
+type SortField = "spend" | "leads" | null;
+type SortDirection = "asc" | "desc";
 
 export function CampaignHierarchyTable({
   campaigns,
   searchQuery,
   onSearchChange,
   loading = false,
+  levelFilter = null,
 }: CampaignHierarchyTableProps) {
   const [expandedCampaigns, setExpandedCampaigns] = useState<ExpandedState>({});
   const [expandedAdSets, setExpandedAdSets] = useState<ExpandedState>({});
+  const [sortField, setSortField] = useState<SortField>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortDirection === "desc") {
+        setSortDirection("asc");
+      } else {
+        setSortField(null);
+      }
+    } else {
+      setSortField(field);
+      setSortDirection("desc");
+    }
+  };
+
+  const sortedCampaigns = [...campaigns].sort((a, b) => {
+    if (!sortField) return 0;
+    const multiplier = sortDirection === "asc" ? 1 : -1;
+    if (sortField === "spend") {
+      return (a.spendUsd - b.spendUsd) * multiplier;
+    }
+    if (sortField === "leads") {
+      return (a.leads - b.leads) * multiplier;
+    }
+    return 0;
+  });
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    return sortDirection === "asc" 
+      ? <ArrowUp className="h-4 w-4 ml-1" />
+      : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
 
   const toggleCampaign = (campaignId: string) => {
     setExpandedCampaigns((prev) => ({
@@ -105,19 +143,49 @@ export function CampaignHierarchyTable({
                 <TableHead>Country</TableHead>
                 <TableHead>Level</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Spend (USD)</TableHead>
-                <TableHead className="text-right">Leads</TableHead>
+                <TableHead className="text-right">
+                  <button
+                    onClick={() => handleSort("spend")}
+                    className="flex items-center justify-end w-full hover:text-gray-900 dark:hover:text-gray-100"
+                  >
+                    Spend (USD)
+                    <SortIcon field="spend" />
+                  </button>
+                </TableHead>
+                <TableHead className="text-right">
+                  <button
+                    onClick={() => handleSort("leads")}
+                    className="flex items-center justify-end w-full hover:text-gray-900 dark:hover:text-gray-100"
+                  >
+                    Leads
+                    <SortIcon field="leads" />
+                  </button>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {campaigns.length === 0 ? (
+              {sortedCampaigns.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                     No campaigns found. Click "Sync Meta" to fetch data.
                   </TableCell>
                 </TableRow>
+              ) : levelFilter === "ad" ? (
+                sortedCampaigns.flatMap((campaign) =>
+                  campaign.adSets.flatMap((adSet) =>
+                    adSet.ads.map((ad) => (
+                      <FlatAdRow key={ad.adId} ad={ad} adSetName={adSet.name} campaignName={campaign.name} />
+                    ))
+                  )
+                )
+              ) : levelFilter === "adset" ? (
+                sortedCampaigns.flatMap((campaign) =>
+                  campaign.adSets.map((adSet) => (
+                    <FlatAdSetRow key={adSet.adSetId} adSet={adSet} campaignName={campaign.name} />
+                  ))
+                )
               ) : (
-                campaigns.map((campaign) => (
+                sortedCampaigns.map((campaign) => (
                   <CampaignRow
                     key={campaign.campaignId}
                     campaign={campaign}
@@ -359,6 +427,137 @@ function AdRow({ ad }: AdRowProps) {
         ${ad.spendUsd.toLocaleString("en-US", { minimumFractionDigits: 2 })}
       </TableCell>
       <TableCell className="text-right text-gray-400">-</TableCell>
+    </TableRow>
+  );
+}
+
+interface FlatAdRowProps {
+  ad: Ad;
+  adSetName: string;
+  campaignName: string;
+}
+
+function FlatAdRow({ ad, adSetName, campaignName }: FlatAdRowProps) {
+  return (
+    <TableRow className="hover:bg-orange-50/50 dark:hover:bg-orange-950/20">
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-orange-600" />
+          <div>
+            <span className="font-medium">{ad.name}</span>
+            <p className="text-xs text-gray-500">{campaignName} → {adSetName}</p>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="text-gray-400">-</TableCell>
+      <TableCell>
+        <div className="flex flex-wrap gap-1">
+          {ad.countries && ad.countries.length > 0 ? (
+            ad.countries.map((country) => (
+              <span
+                key={country}
+                className="inline-flex items-center rounded-md bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900 dark:text-orange-300"
+              >
+                {country}
+              </span>
+            ))
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell>
+        <span className="inline-flex items-center rounded-md bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700 dark:bg-orange-900 dark:text-orange-300">
+          Ad
+        </span>
+      </TableCell>
+      <TableCell>
+        <span
+          className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+            ad.status === "ACTIVE"
+              ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+              : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+          }`}
+        >
+          {ad.status || "Unknown"}
+        </span>
+      </TableCell>
+      <TableCell className="text-right font-medium">
+        ${ad.spendUsd.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex items-center justify-end gap-1">
+          <Users className="h-4 w-4 text-violet-500" />
+          <span className="text-violet-600 font-medium">
+            {ad.leads?.toLocaleString("en-US") || 0}
+          </span>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+interface FlatAdSetRowProps {
+  adSet: AdSet;
+  campaignName: string;
+}
+
+function FlatAdSetRow({ adSet, campaignName }: FlatAdSetRowProps) {
+  return (
+    <TableRow className="hover:bg-purple-50/50 dark:hover:bg-purple-950/20">
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <Target className="h-4 w-4 text-purple-600" />
+          <div>
+            <span className="font-medium">{adSet.name}</span>
+            <p className="text-xs text-gray-500">{campaignName}</p>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="text-gray-400">-</TableCell>
+      <TableCell>
+        <div className="flex flex-wrap gap-1">
+          {adSet.countries && adSet.countries.length > 0 ? (
+            adSet.countries.map((country) => (
+              <span
+                key={country}
+                className="inline-flex items-center rounded-md bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900 dark:text-purple-300"
+              >
+                {country}
+              </span>
+            ))
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell>
+        <span className="inline-flex items-center rounded-md bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+          Ad Set
+        </span>
+      </TableCell>
+      <TableCell>
+        <span
+          className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+            adSet.status === "ACTIVE"
+              ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+              : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+          }`}
+        >
+          {adSet.status || "Unknown"}
+        </span>
+      </TableCell>
+      <TableCell className="text-right font-medium">
+        ${adSet.spendUsd.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex items-center justify-end gap-1">
+          <Users className="h-4 w-4 text-violet-500" />
+          <span className="text-violet-600 font-medium">
+            {adSet.leads?.toLocaleString("en-US") || 0}
+          </span>
+        </div>
+      </TableCell>
     </TableRow>
   );
 }

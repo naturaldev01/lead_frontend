@@ -52,12 +52,14 @@ export const api = {
     return fetchAPI<Campaign[]>(`/api/campaigns?${searchParams}`);
   },
 
-  getCampaignHierarchy: (params?: { accountId?: string; search?: string; country?: string; level?: string }) => {
+  getCampaignHierarchy: (params?: { accountId?: string; search?: string; country?: string; level?: string; startDate?: string; endDate?: string }) => {
     const searchParams = new URLSearchParams({
       ...(params?.accountId && { accountId: params.accountId }),
       ...(params?.search && { search: params.search }),
       ...(params?.country && { country: params.country }),
       ...(params?.level && { level: params.level }),
+      ...(params?.startDate && { startDate: params.startDate }),
+      ...(params?.endDate && { endDate: params.endDate }),
     });
     return fetchAPI<CampaignHierarchy[]>(`/api/campaigns/hierarchy?${searchParams}`);
   },
