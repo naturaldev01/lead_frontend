@@ -78,7 +78,12 @@ export function DateRangePicker({ date, onDateChange, isAllTime, onAllTimeChange
     if (onAllTimeChange) {
       onAllTimeChange(false);
     }
-    onDateChange(newDate);
+    // If only from is selected (single day click), set to = from for single day view
+    if (newDate?.from && !newDate?.to) {
+      onDateChange({ from: newDate.from, to: newDate.from });
+    } else {
+      onDateChange(newDate);
+    }
   };
 
   const isCustomRange = !isAllTime && activePreset === null && date?.from;
@@ -121,12 +126,12 @@ export function DateRangePicker({ date, onDateChange, isAllTime, onAllTimeChange
             {isAllTime ? (
               <span className="text-muted-foreground">Custom range</span>
             ) : date?.from ? (
-              date.to ? (
+              date.to && date.from.getTime() !== date.to.getTime() ? (
                 <>
                   {format(date.from, "MMM dd")} - {format(date.to, "MMM dd, yyyy")}
                 </>
               ) : (
-                format(date.from, "LLL dd, yyyy")
+                format(date.from, "MMM dd, yyyy")
               )
             ) : (
               <span>Custom range</span>
