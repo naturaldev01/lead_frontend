@@ -100,8 +100,9 @@ export function CampaignHierarchyTable({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[40%]">Name</TableHead>
+                <TableHead className="w-[35%]">Name</TableHead>
                 <TableHead>Ad Account</TableHead>
+                <TableHead>Country</TableHead>
                 <TableHead>Level</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Spend (USD)</TableHead>
@@ -111,7 +112,7 @@ export function CampaignHierarchyTable({
             <TableBody>
               {campaigns.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                     No campaigns found. Click "Sync Meta" to fetch data.
                   </TableCell>
                 </TableRow>
@@ -179,6 +180,22 @@ function CampaignRow({
           <div className="flex flex-col">
             <span>{campaign.adAccountName}</span>
             <span className="text-xs text-gray-400">{campaign.adAccountId}</span>
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="flex flex-wrap gap-1">
+            {campaign.countries && campaign.countries.length > 0 ? (
+              campaign.countries.map((country) => (
+                <span
+                  key={country}
+                  className="inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
+                >
+                  {country}
+                </span>
+              ))
+            ) : (
+              <span className="text-gray-400">-</span>
+            )}
           </div>
         </TableCell>
         <TableCell>
@@ -250,6 +267,22 @@ function AdSetRow({ adSet, isExpanded, onToggle }: AdSetRowProps) {
         </TableCell>
         <TableCell>-</TableCell>
         <TableCell>
+          <div className="flex flex-wrap gap-1">
+            {adSet.countries && adSet.countries.length > 0 ? (
+              adSet.countries.map((country) => (
+                <span
+                  key={country}
+                  className="inline-flex items-center rounded-md bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900 dark:text-purple-300"
+                >
+                  {country}
+                </span>
+              ))
+            ) : (
+              <span className="text-gray-400">-</span>
+            )}
+          </div>
+        </TableCell>
+        <TableCell>
           <span className="inline-flex items-center rounded-md bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700 dark:bg-purple-900 dark:text-purple-300">
             Ad Set
           </span>
@@ -290,6 +323,22 @@ function AdRow({ ad }: AdRowProps) {
         </div>
       </TableCell>
       <TableCell>-</TableCell>
+      <TableCell>
+        <div className="flex flex-wrap gap-1">
+          {ad.countries && ad.countries.length > 0 ? (
+            ad.countries.map((country) => (
+              <span
+                key={country}
+                className="inline-flex items-center rounded-md bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900 dark:text-orange-300"
+              >
+                {country}
+              </span>
+            ))
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </div>
+      </TableCell>
       <TableCell>
         <span className="inline-flex items-center rounded-md bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700 dark:bg-orange-900 dark:text-orange-300">
           Ad

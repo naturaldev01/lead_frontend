@@ -52,13 +52,17 @@ export const api = {
     return fetchAPI<Campaign[]>(`/api/campaigns?${searchParams}`);
   },
 
-  getCampaignHierarchy: (params?: { accountId?: string; search?: string }) => {
+  getCampaignHierarchy: (params?: { accountId?: string; search?: string; country?: string; level?: string }) => {
     const searchParams = new URLSearchParams({
       ...(params?.accountId && { accountId: params.accountId }),
       ...(params?.search && { search: params.search }),
+      ...(params?.country && { country: params.country }),
+      ...(params?.level && { level: params.level }),
     });
     return fetchAPI<CampaignHierarchy[]>(`/api/campaigns/hierarchy?${searchParams}`);
   },
+
+  getAvailableCountries: () => fetchAPI<string[]>("/api/campaigns/countries"),
 
   syncMeta: () => fetchAPI<{ success: boolean }>("/api/meta/sync", { method: "POST" }),
 
@@ -147,6 +151,7 @@ export interface Ad {
   status: string;
   spendUsd: number;
   leads: number;
+  countries: string[];
 }
 
 export interface AdSet {
@@ -157,6 +162,7 @@ export interface AdSet {
   optimizationGoal: string;
   spendUsd: number;
   leads: number;
+  countries: string[];
   ads: Ad[];
 }
 
@@ -168,6 +174,7 @@ export interface CampaignHierarchy {
   adAccountName: string;
   type: string;
   status: string;
+  countries: string[];
   spendUsd: number;
   leads: number;
   formLeads: number;

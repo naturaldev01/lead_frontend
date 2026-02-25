@@ -16,6 +16,7 @@ import { StatsCards } from "@/components/dashboard/stats-cards";
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
 import { CampaignsTable } from "@/components/dashboard/campaigns-table";
 import { CampaignHierarchyTable } from "@/components/dashboard/campaign-hierarchy-table";
+import { HierarchyFilters } from "@/components/dashboard/hierarchy-filters";
 import { Badge } from "@/components/ui/badge";
 import { api, DashboardStats, Campaign, CampaignHierarchy } from "@/lib/api";
 
@@ -43,6 +44,9 @@ export default function DashboardPage() {
     spend: "-",
     leads: "-",
   });
+  const [availableCountries, setAvailableCountries] = useState<string[]>([]);
+  const [countryFilter, setCountryFilter] = useState<string | null>(null);
+  const [levelFilter, setLevelFilter] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!isAllTime && (!dateRange?.from || !dateRange?.to)) return;
@@ -51,7 +55,7 @@ export default function DashboardPage() {
       const startDate = isAllTime ? undefined : format(dateRange!.from!, "yyyy-MM-dd");
       const endDate = isAllTime ? undefined : format(dateRange!.to!, "yyyy-MM-dd");
 
-      const [statsData, campaignsData, hierarchyData] = await Promise.all([
+      const [statsData, campaignsData, hierarchyData, countriesData] = await Promise.all([
         api.getDashboardStats({
           startDate,
           endDate,
@@ -67,12 +71,16 @@ export default function DashboardPage() {
         api.getCampaignHierarchy({
           accountId: accountFilter !== "all" ? accountFilter : undefined,
           search: searchQuery || undefined,
+          country: countryFilter || undefined,
+          level: levelFilter || undefined,
         }),
+        api.getAvailableCountries(),
       ]);
 
       setStats(statsData);
       setCampaigns(campaignsData);
       setCampaignHierarchy(hierarchyData);
+      setAvailableCountries(countriesData);
 
       if (statsData.lastSpendSync) {
         setLastSyncTime((prev) => ({
@@ -91,7 +99,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, isAllTime, accountFilter, objectiveFilter, searchQuery]);
+  }, [dateRange, isAllTime, accountFilter, objectiveFilter, searchQuery, countryFilter, levelFilter]);
 
   useEffect(() => {
     fetchData();
@@ -195,24 +203,36 @@ export default function DashboardPage() {
 
       <StatsCards totalSpend={stats.totalSpend} totalLeads={stats.totalLeads} />
 
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-sm text-gray-500">View:</span>
-        <Button
-          variant={viewMode === "flat" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setViewMode("flat")}
-        >
-          <LayoutList className="h-4 w-4 mr-1" />
-          Flat
-        </Button>
-        <Button
-          variant={viewMode === "hierarchy" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setViewMode("hierarchy")}
-        >
-          <Layers className="h-4 w-4 mr-1" />
-          Hierarchy
-        </Button>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-500">View:</span>
+          <Button
+            variant={viewMode === "flat" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("flat")}
+          >
+            <LayoutList className="h-4 w-4 mr-1" />
+            Flat
+          </Button>
+          <Button
+            variant={viewMode === "hierarchy" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("hierarchy")}
+          >
+            <Layers className="h-4 w-4 mr-1" />
+            Hierarchy
+          </Button>
+        </div>
+        
+        {viewMode === "hierarchy" && (
+          <HierarchyFilters
+            countries={availableCountries}
+            selectedCountry={countryFilter}
+            selectedLevel={levelFilter}
+            onCountryChange={setCountryFilter}
+            onLevelChange={setLevelFilter}
+          />
+        )}
       </div>
 
       {viewMode === "flat" ? (
