@@ -273,7 +273,7 @@ function CampaignRow({
         </TableCell>
         <TableCell>
           <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-900 dark:text-green-300">
-            {campaign.type || "Active"}
+            {campaign.status || "Unknown"}
           </span>
         </TableCell>
         <TableCell className="text-right font-medium">
