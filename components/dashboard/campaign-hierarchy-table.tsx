@@ -277,13 +277,13 @@ function CampaignRow({
           </span>
         </TableCell>
         <TableCell className="text-right font-medium">
-          ${campaign.spendUsd.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+          ${(campaign.spendUsd || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
         </TableCell>
         <TableCell className="text-right">
           <div className="flex items-center justify-end gap-1">
             <Users className="h-4 w-4 text-violet-500" />
             <span className="text-violet-600 font-medium">
-              {campaign.leads.toLocaleString("en-US")}
+              {(campaign.leads || 0).toLocaleString("en-US")}
             </span>
           </div>
         </TableCell>
@@ -367,9 +367,16 @@ function AdSetRow({ adSet, isExpanded, onToggle }: AdSetRowProps) {
           </span>
         </TableCell>
         <TableCell className="text-right font-medium">
-          ${adSet.spendUsd.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+          ${(adSet.spendUsd || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
         </TableCell>
-        <TableCell className="text-right text-gray-400">-</TableCell>
+        <TableCell className="text-right">
+          <div className="flex items-center justify-end gap-1">
+            <Users className="h-4 w-4 text-violet-500" />
+            <span className="text-violet-600 font-medium">
+              {(adSet.leads || 0).toLocaleString("en-US")}
+            </span>
+          </div>
+        </TableCell>
       </TableRow>
       {isExpanded &&
         adSet.ads.map((ad) => <AdRow key={ad.adId} ad={ad} />)}
@@ -424,9 +431,16 @@ function AdRow({ ad }: AdRowProps) {
         </span>
       </TableCell>
       <TableCell className="text-right font-medium">
-        ${ad.spendUsd.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+        ${(ad.spendUsd || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
       </TableCell>
-      <TableCell className="text-right text-gray-400">-</TableCell>
+      <TableCell className="text-right">
+        <div className="flex items-center justify-end gap-1">
+          <Users className="h-4 w-4 text-violet-500" />
+          <span className="text-violet-600 font-medium">
+            {(ad.leads || 0).toLocaleString("en-US")}
+          </span>
+        </div>
+      </TableCell>
     </TableRow>
   );
 }
@@ -483,13 +497,13 @@ function FlatAdRow({ ad, adSetName, campaignName }: FlatAdRowProps) {
         </span>
       </TableCell>
       <TableCell className="text-right font-medium">
-        ${ad.spendUsd.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+        ${(ad.spendUsd || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1">
           <Users className="h-4 w-4 text-violet-500" />
           <span className="text-violet-600 font-medium">
-            {ad.leads?.toLocaleString("en-US") || 0}
+            {(ad.leads || 0).toLocaleString("en-US")}
           </span>
         </div>
       </TableCell>
@@ -548,13 +562,13 @@ function FlatAdSetRow({ adSet, campaignName }: FlatAdSetRowProps) {
         </span>
       </TableCell>
       <TableCell className="text-right font-medium">
-        ${adSet.spendUsd.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+        ${(adSet.spendUsd || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1">
           <Users className="h-4 w-4 text-violet-500" />
           <span className="text-violet-600 font-medium">
-            {adSet.leads?.toLocaleString("en-US") || 0}
+            {(adSet.leads || 0).toLocaleString("en-US")}
           </span>
         </div>
       </TableCell>
