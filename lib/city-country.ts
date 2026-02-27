@@ -12,6 +12,146 @@ let cityToCountryMap: Map<string, string> | null = null;
 let isLoading = false;
 let loadPromise: Promise<void> | null = null;
 
+// Manual mappings for cities missing from the API database
+// Includes Turkey provinces, major cities with alternative spellings, etc.
+const MANUAL_CITY_MAPPINGS: Record<string, string> = {
+  // Turkey - All 81 provinces (some missing from API)
+  "bursa": "Turkey",
+  "izmir": "Turkey",
+  "gaziantep": "Turkey",
+  "kocaeli": "Turkey",
+  "mugla": "Turkey",
+  "muğla": "Turkey",
+  "aydin": "Turkey",
+  "aydın": "Turkey",
+  "balikesir": "Turkey",
+  "balıkesir": "Turkey",
+  "manisa": "Turkey",
+  "denizli": "Turkey",
+  "hatay": "Turkey",
+  "maras": "Turkey",
+  "kahramanmaras": "Turkey",
+  "kahramanmaraş": "Turkey",
+  "sanliurfa": "Turkey",
+  "şanlıurfa": "Turkey",
+  "urfa": "Turkey",
+  "diyarbakir": "Turkey",
+  "diyarbakır": "Turkey",
+  "mardin": "Turkey",
+  "trabzon": "Turkey",
+  "samsun": "Turkey",
+  "ordu": "Turkey",
+  "giresun": "Turkey",
+  "rize": "Turkey",
+  "artvin": "Turkey",
+  "erzurum": "Turkey",
+  "erzincan": "Turkey",
+  "van": "Turkey",
+  "mus": "Turkey",
+  "muş": "Turkey",
+  "agri": "Turkey",
+  "ağrı": "Turkey",
+  "kars": "Turkey",
+  "igdir": "Turkey",
+  "iğdır": "Turkey",
+  "ardahan": "Turkey",
+  "bitlis": "Turkey",
+  "batman": "Turkey",
+  "siirt": "Turkey",
+  "sirnak": "Turkey",
+  "şırnak": "Turkey",
+  "hakkari": "Turkey",
+  "elazig": "Turkey",
+  "elazığ": "Turkey",
+  "malatya": "Turkey",
+  "tunceli": "Turkey",
+  "bingol": "Turkey",
+  "bingöl": "Turkey",
+  "kayseri": "Turkey",
+  "nevsehir": "Turkey",
+  "nevşehir": "Turkey",
+  "nigde": "Turkey",
+  "niğde": "Turkey",
+  "aksaray": "Turkey",
+  "kirsehir": "Turkey",
+  "kırşehir": "Turkey",
+  "yozgat": "Turkey",
+  "sivas": "Turkey",
+  "tokat": "Turkey",
+  "amasya": "Turkey",
+  "corum": "Turkey",
+  "çorum": "Turkey",
+  "kastamonu": "Turkey",
+  "sinop": "Turkey",
+  "bartin": "Turkey",
+  "bartın": "Turkey",
+  "karabuk": "Turkey",
+  "karabük": "Turkey",
+  "zonguldak": "Turkey",
+  "duzce": "Turkey",
+  "düzce": "Turkey",
+  "bolu": "Turkey",
+  "bilecik": "Turkey",
+  "eskisehir": "Turkey",
+  "eskişehir": "Turkey",
+  "kutahya": "Turkey",
+  "kütahya": "Turkey",
+  "usak": "Turkey",
+  "uşak": "Turkey",
+  "afyon": "Turkey",
+  "afyonkarahisar": "Turkey",
+  "isparta": "Turkey",
+  "burdur": "Turkey",
+  "kirikkale": "Turkey",
+  "kırıkkale": "Turkey",
+  "cankiri": "Turkey",
+  "çankırı": "Turkey",
+  "bayburt": "Turkey",
+  "gumushane": "Turkey",
+  "gümüşhane": "Turkey",
+  "sisli": "Turkey",
+  "şişli": "Turkey",
+  "fatih": "Turkey",
+  "bahcelievler": "Turkey",
+  "bahçelievler": "Turkey",
+  "catalca": "Turkey",
+  "çatalca": "Turkey",
+  // Istanbul districts (common ones)
+  "bahcelievler istanbul": "Turkey",
+  "bahçelievler istanbul": "Turkey",
+  // Portugal common cities/regions
+  "lisboa": "Portugal",
+  "lisbon": "Portugal",
+  // USA - states as cities (common input errors)
+  "nj": "United States",
+  "new jersey": "United States",
+  "ga": "United States",
+  "guyton ga": "United States",
+  "lake wales florida": "United States",
+  "melbourne australia victoria": "Australia",
+  // UK cities
+  "walkerburn": "United Kingdom",
+  // Nigeria
+  "ekiti": "Nigeria",
+  // Gaza
+  "gaza": "Palestine",
+  // New York variations
+  "new york": "United States",
+  "ny": "United States",
+  // St. abbreviations
+  "st louis": "United States",
+  "st thomas": "United States Virgin Islands",
+  "st. francis": "United States",
+  // Montreal variations  
+  "montreal": "Canada",
+  "montréal": "Canada",
+  // Other common ones
+  "padua": "Italy",
+  "w bridgewater": "United States",
+  "antwerp belgium": "Belgium",
+  "longyearbyen": "Norway",
+};
+
 // Normalize city name for comparison
 function normalizeCity(city: string): string {
   return city
@@ -64,17 +204,26 @@ async function loadCityCountryData(): Promise<void> {
 
       cityToCountryMap = new Map();
 
+      // First, add manual mappings (these take priority)
+      for (const [city, country] of Object.entries(MANUAL_CITY_MAPPINGS)) {
+        const normalizedCity = normalizeCity(city);
+        cityToCountryMap.set(normalizedCity, country);
+      }
+      
+      const manualCount = cityToCountryMap.size;
+
+      // Then add from API database
       for (const countryData of data) {
         for (const city of countryData.cities) {
           const normalizedCity = normalizeCity(city);
-          // Only set if not already set (first country wins for duplicates)
+          // Only set if not already set (manual mappings take priority)
           if (!cityToCountryMap.has(normalizedCity)) {
             cityToCountryMap.set(normalizedCity, countryData.name);
           }
         }
       }
 
-      console.log(`[CityCountry] Loaded ${cityToCountryMap.size} city mappings from comprehensive database`);
+      console.log(`[CityCountry] Loaded ${cityToCountryMap.size} city mappings (${manualCount} manual + ${cityToCountryMap.size - manualCount} from API)`);
     } catch (error) {
       console.error("[CityCountry] Failed to load city-country data:", error);
       cityToCountryMap = new Map();
