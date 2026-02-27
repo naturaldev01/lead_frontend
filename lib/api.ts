@@ -78,6 +78,7 @@ export const api = {
     search?: string;
     page?: number;
     limit?: number;
+    includeFieldData?: boolean;
   }) => {
     const searchParams = new URLSearchParams({
       startDate: params.startDate,
@@ -88,6 +89,7 @@ export const api = {
       ...(params.search && { search: params.search }),
       page: String(params.page || 1),
       limit: String(params.limit || 50),
+      ...(params.includeFieldData && { includeFieldData: 'true' }),
     });
     return fetchAPI<LeadsResponse>(`/api/leads?${searchParams}`);
   },
@@ -126,6 +128,28 @@ export const api = {
 
   // Ad Accounts
   getAdAccounts: () => fetchAPI<AdAccount[]>("/api/ad-accounts"),
+
+  // Field Mappings
+  getFieldMappings: () => fetchAPI<FieldMapping[]>("/api/field-mappings"),
+
+  getUnmappedFields: () => fetchAPI<UnmappedField[]>("/api/field-mappings/unmapped"),
+
+  getStandardFields: () => fetchAPI<string[]>("/api/field-mappings/standard-fields"),
+
+  createFieldMapping: (data: CreateFieldMappingDto) =>
+    fetchAPI<FieldMapping>("/api/field-mappings", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateFieldMapping: (id: string, data: UpdateFieldMappingDto) =>
+    fetchAPI<FieldMapping>(`/api/field-mappings/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  deleteFieldMapping: (id: string) =>
+    fetchAPI<void>(`/api/field-mappings/${id}`, { method: "DELETE" }),
 };
 
 // Types
@@ -184,6 +208,12 @@ export interface CampaignHierarchy {
   adSets: AdSet[];
 }
 
+export interface LeadFieldData {
+  name: string;
+  mappedName: string | null;
+  values: string[];
+}
+
 export interface Lead {
   id: string;
   leadId: string;
@@ -195,13 +225,11 @@ export interface Lead {
   adName: string;
   formName: string;
   source: string;
+  fieldData?: LeadFieldData[];
 }
 
 export interface LeadDetails extends Lead {
-  fieldData: Array<{
-    name: string;
-    values: string[];
-  }>;
+  fieldData: LeadFieldData[];
 }
 
 export interface LeadsResponse {
@@ -251,4 +279,33 @@ export interface AdAccount {
   id: string;
   accountId: string;
   accountName: string;
+}
+
+export interface FieldMapping {
+  id: string;
+  raw_field_name: string;
+  mapped_field: string;
+  language: string | null;
+  auto_detected: boolean;
+  created_at: string;
+}
+
+export interface UnmappedField {
+  fieldName: string;
+  count: number;
+  sampleValues: string[];
+}
+
+export interface CreateFieldMappingDto {
+  rawFieldName: string;
+  mappedField: string;
+  language?: string;
+  autoDetected?: boolean;
+}
+
+export interface UpdateFieldMappingDto {
+  rawFieldName?: string;
+  mappedField?: string;
+  language?: string;
+  autoDetected?: boolean;
 }

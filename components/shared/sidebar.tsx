@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, Bell, Link2 } from "lucide-react";
+import { LayoutDashboard, Users, Bell, Link2, ListFilter, GitMerge } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Leads", href: "/leads-center", icon: ListFilter },
   { name: "Incoming Leads", href: "/leads", icon: Users },
   { name: "Subscriptions", href: "/subscriptions", icon: Bell },
+  { name: "Field Mappings", href: "/field-mappings", icon: GitMerge },
   { name: "Mappings", href: "/mappings", icon: Link2 },
 ];
 
