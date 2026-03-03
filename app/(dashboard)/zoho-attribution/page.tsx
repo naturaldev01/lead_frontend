@@ -6,7 +6,6 @@ import { DateRange } from "react-day-picker";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
-import { PhoneLookupCard } from "@/components/zoho/phone-lookup-card";
 import { FunnelStatsCards } from "@/components/zoho/funnel-stats-cards";
 import { FunnelChart } from "@/components/zoho/funnel-chart";
 import { api, ZohoFunnelStats } from "@/lib/api";
@@ -68,8 +67,6 @@ export default function ZohoAttributionPage() {
           onAllTimeChange={setIsAllTime}
         />
       </div>
-
-      <PhoneLookupCard />
 
       <FunnelStatsCards stats={stats} loading={loading} />
 
