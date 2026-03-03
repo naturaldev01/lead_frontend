@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
 import { FunnelStatsCards } from "@/components/zoho/funnel-stats-cards";
 import { FunnelChart } from "@/components/zoho/funnel-chart";
+import { AttributionTable } from "@/components/zoho/attribution-table";
 import { api, ZohoFunnelStats } from "@/lib/api";
 
 export default function ZohoAttributionPage() {
@@ -71,6 +72,11 @@ export default function ZohoAttributionPage() {
       <FunnelStatsCards stats={stats} loading={loading} />
 
       <FunnelChart stats={stats} loading={loading} />
+
+      <AttributionTable 
+        startDate={!isAllTime && dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined}
+        endDate={!isAllTime && dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined}
+      />
     </div>
   );
 }

@@ -168,6 +168,16 @@ export const api = {
 
   zohoCostByPhone: (phone: string) =>
     fetchAPI<ZohoCostResult>(`/api/zoho/cost/${encodeURIComponent(phone)}`),
+
+  zohoAttributionList: (params?: { startDate?: string; endDate?: string; page?: number; limit?: number }) => {
+    const searchParams = new URLSearchParams({
+      ...(params?.startDate && { startDate: params.startDate }),
+      ...(params?.endDate && { endDate: params.endDate }),
+      ...(params?.page && { page: String(params.page) }),
+      ...(params?.limit && { limit: String(params.limit) }),
+    });
+    return fetchAPI<ZohoAttributionListResponse>(`/api/zoho/attributions?${searchParams}`);
+  },
 };
 
 // Types
@@ -412,4 +422,34 @@ export interface ZohoCostResult {
   paymentAmount?: number;
   roas?: number;
   message?: string;
+}
+
+export interface ZohoAttributionItem {
+  id: string;
+  phone: string;
+  leadId: string;
+  leadDate: string;
+  campaignName: string;
+  campaignId: string;
+  adName: string | null;
+  adSetName: string | null;
+  formName: string | null;
+  funnelStage: string;
+  attributedSpend: number;
+  dealAmount: number | null;
+  paymentAmount: number | null;
+  roas: number | null;
+  contactDate: string | null;
+  offerDate: string | null;
+  dealDate: string | null;
+  paymentDate: string | null;
+  createdAt: string;
+}
+
+export interface ZohoAttributionListResponse {
+  data: ZohoAttributionItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
