@@ -150,6 +150,24 @@ export const api = {
 
   deleteFieldMapping: (id: string) =>
     fetchAPI<void>(`/api/field-mappings/${id}`, { method: "DELETE" }),
+
+  // Zoho Attribution
+  zohoLookup: (phone: string) =>
+    fetchAPI<ZohoLookupResult>(`/api/zoho/lookup?phone=${encodeURIComponent(phone)}`),
+
+  zohoFunnelStats: (params?: { startDate?: string; endDate?: string }) => {
+    const searchParams = new URLSearchParams({
+      ...(params?.startDate && { startDate: params.startDate }),
+      ...(params?.endDate && { endDate: params.endDate }),
+    });
+    return fetchAPI<ZohoFunnelStats>(`/api/zoho/funnel-stats?${searchParams}`);
+  },
+
+  zohoGetAttribution: (leadId: string) =>
+    fetchAPI<ZohoAttribution>(`/api/zoho/attribution/${leadId}`),
+
+  zohoCostByPhone: (phone: string) =>
+    fetchAPI<ZohoCostResult>(`/api/zoho/cost/${encodeURIComponent(phone)}`),
 };
 
 // Types
@@ -308,4 +326,90 @@ export interface UpdateFieldMappingDto {
   mappedField?: string;
   language?: string;
   autoDetected?: boolean;
+}
+
+// Zoho Attribution Types
+export interface ZohoLookupResult {
+  found: boolean;
+  lead?: {
+    id: string;
+    leadId: string;
+    date: string;
+    campaign: string;
+    campaignId: string;
+    adSet: string;
+    ad: string;
+    form: string;
+  };
+  costs?: {
+    attributedSpend: number;
+    currency: string;
+    costPerLead: number;
+  };
+  funnel?: {
+    currentStage: string;
+    stages: {
+      lead?: string;
+      contact?: string;
+      offer?: string;
+      deal?: string;
+      payment?: string;
+    };
+    dealAmount?: number;
+    paymentAmount?: number;
+  };
+  roas?: number;
+}
+
+export interface ZohoFunnelStats {
+  total: number;
+  byStage: Record<string, number>;
+  conversionRates: Record<string, number>;
+  avgSpend: number;
+  avgRoas: number;
+  totalRevenue: number;
+  totalSpend: number;
+}
+
+export interface ZohoAttribution {
+  found: boolean;
+  attribution?: {
+    id: string;
+    lead_id: string;
+    phone_normalized: string;
+    campaign_id: string;
+    attributed_spend_usd: number;
+    funnel_stage: string;
+    deal_amount: number | null;
+    payment_amount: number | null;
+    roas: number | null;
+    lead_date: string;
+    contact_date: string | null;
+    offer_date: string | null;
+    deal_date: string | null;
+    payment_date: string | null;
+    leads?: {
+      lead_id: string;
+      form_name: string;
+      ad_name: string;
+      ad_set_name: string;
+      created_at: string;
+      campaigns: { name: string } | null;
+    };
+  };
+}
+
+export interface ZohoCostResult {
+  found: boolean;
+  phone?: string;
+  campaign?: string;
+  ad?: string;
+  leadDate?: string;
+  attributedSpend?: number;
+  currency?: string;
+  funnelStage?: string;
+  dealAmount?: number;
+  paymentAmount?: number;
+  roas?: number;
+  message?: string;
 }
