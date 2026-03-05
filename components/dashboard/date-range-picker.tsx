@@ -40,8 +40,8 @@ function getMatchingPreset(date: DateRange | undefined): number | null {
   const daysFromToday = Math.abs(differenceInDays(toDate, today));
   if (daysFromToday > 1) return null;
   
-  // Calculate the range in days
-  const rangeDays = differenceInDays(toDate, fromDate);
+  // Inclusive day count (same mental model as preset labels)
+  const rangeDays = differenceInDays(toDate, fromDate) + 1;
   
   // Check if it matches any preset (with 1 day tolerance)
   for (const preset of PRESET_RANGES) {
@@ -70,7 +70,8 @@ export function DateRangePicker({ date, onDateChange, isAllTime, onAllTimeChange
       onAllTimeChange(false);
     }
     const today = new Date();
-    const from = subDays(today, days);
+    // "Last N days" should be inclusive: today + previous N-1 days
+    const from = subDays(today, days - 1);
     onDateChange({ from, to: today });
   };
 
