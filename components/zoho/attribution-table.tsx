@@ -2,7 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
-import { ChevronLeft, ChevronRight, Phone, DollarSign, TrendingUp } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+  DollarSign,
+  Phone,
+  TrendingUp,
+} from "lucide-react";
 import {
   Table,
   TableBody,
@@ -15,6 +24,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { api, ZohoAttributionItem } from "@/lib/api";
 
 interface AttributionTableProps {
@@ -38,12 +54,19 @@ const stageLabels: Record<string, string> = {
   payment: "Payment",
 };
 
+type OfferFilter = "all" | "with_offer" | "without_offer";
+type SortBy = "created_at" | "offer_amount" | "deal_amount" | "payment_amount" | "roas";
+type SortDirection = "asc" | "desc";
+
 export function AttributionTable({ startDate, endDate }: AttributionTableProps) {
   const [data, setData] = useState<ZohoAttributionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [total, setTotal] = useState(0);
+  const [offerFilter, setOfferFilter] = useState<OfferFilter>("all");
+  const [sortBy, setSortBy] = useState<SortBy>("created_at");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const limit = 15;
 
   const fetchData = useCallback(async () => {
@@ -54,6 +77,9 @@ export function AttributionTable({ startDate, endDate }: AttributionTableProps) 
         endDate,
         page,
         limit,
+        offerFilter,
+        sortBy,
+        sortDirection,
       });
       setData(response.data);
       setTotalPages(response.totalPages);
@@ -63,7 +89,7 @@ export function AttributionTable({ startDate, endDate }: AttributionTableProps) 
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate, page]);
+  }, [startDate, endDate, page, offerFilter, sortBy, sortDirection]);
 
   useEffect(() => {
     fetchData();
@@ -71,7 +97,7 @@ export function AttributionTable({ startDate, endDate }: AttributionTableProps) 
 
   useEffect(() => {
     setPage(1);
-  }, [startDate, endDate]);
+  }, [startDate, endDate, offerFilter, sortBy, sortDirection]);
 
   const formatCurrency = (value: number | null, currency: string = "USD") => {
     if (value === null || value === undefined) return "-";
@@ -88,6 +114,28 @@ export function AttributionTable({ startDate, endDate }: AttributionTableProps) 
       return `+${phone.slice(0, 2)} ${phone.slice(2, 5)} ${phone.slice(5, 8)} ${phone.slice(8)}`;
     }
     return phone.startsWith("+") ? phone : `+${phone}`;
+  };
+
+  const toggleAmountSort = (field: Exclude<SortBy, "created_at">) => {
+    if (sortBy !== field) {
+      setSortBy(field);
+      setSortDirection("desc");
+      return;
+    }
+
+    setSortDirection((current) => (current === "desc" ? "asc" : "desc"));
+  };
+
+  const renderAmountSortIcon = (field: Exclude<SortBy, "created_at">) => {
+    if (sortBy !== field) {
+      return <ArrowUpDown className="h-4 w-4 opacity-50" />;
+    }
+
+    return sortDirection === "asc" ? (
+      <ArrowUp className="h-4 w-4" />
+    ) : (
+      <ArrowDown className="h-4 w-4" />
+    );
   };
 
   if (loading && data.length === 0) {
@@ -130,6 +178,35 @@ export function AttributionTable({ startDate, endDate }: AttributionTableProps) 
           </div>
         ) : (
           <>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <Select
+                value={offerFilter}
+                onValueChange={(value: OfferFilter) => setOfferFilter(value)}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Offer filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All records</SelectItem>
+                  <SelectItem value="with_offer">With offer amount</SelectItem>
+                  <SelectItem value="without_offer">Without offer amount</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {sortBy !== "created_at" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSortBy("created_at");
+                    setSortDirection("desc");
+                  }}
+                >
+                  Clear offer sort
+                </Button>
+              )}
+            </div>
+
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -144,13 +221,46 @@ export function AttributionTable({ startDate, endDate }: AttributionTableProps) 
                         CPL
                       </div>
                     </TableHead>
-                    <TableHead className="text-right">Deal</TableHead>
-                    <TableHead className="text-right">Payment</TableHead>
                     <TableHead className="text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleAmountSort("offer_amount")}
+                        className="inline-flex items-center justify-end gap-1 font-medium"
+                      >
+                        Offer
+                        {renderAmountSortIcon("offer_amount")}
+                      </button>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => toggleAmountSort("deal_amount")}
+                        className="inline-flex items-center justify-end gap-1 font-medium"
+                      >
+                        Deal
+                        {renderAmountSortIcon("deal_amount")}
+                      </button>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => toggleAmountSort("payment_amount")}
+                        className="inline-flex items-center justify-end gap-1 font-medium"
+                      >
+                        Payment
+                        {renderAmountSortIcon("payment_amount")}
+                      </button>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => toggleAmountSort("roas")}
+                        className="inline-flex items-center justify-end gap-1 font-medium"
+                      >
                         <TrendingUp className="h-4 w-4" />
                         ROAS
-                      </div>
+                        {renderAmountSortIcon("roas")}
+                      </button>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -173,6 +283,9 @@ export function AttributionTable({ startDate, endDate }: AttributionTableProps) 
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {formatCurrency(item.attributedSpend)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(item.offerAmount, "EUR")}
                       </TableCell>
                       <TableCell className="text-right">
                         {formatCurrency(item.dealAmount, "EUR")}

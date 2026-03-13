@@ -169,12 +169,23 @@ export const api = {
   zohoCostByPhone: (phone: string) =>
     fetchAPI<ZohoCostResult>(`/api/zoho/cost/${encodeURIComponent(phone)}`),
 
-  zohoAttributionList: (params?: { startDate?: string; endDate?: string; page?: number; limit?: number }) => {
+  zohoAttributionList: (params?: {
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+    offerFilter?: "all" | "with_offer" | "without_offer";
+    sortBy?: "created_at" | "offer_amount" | "deal_amount" | "payment_amount" | "roas";
+    sortDirection?: "asc" | "desc";
+  }) => {
     const searchParams = new URLSearchParams({
       ...(params?.startDate && { startDate: params.startDate }),
       ...(params?.endDate && { endDate: params.endDate }),
       ...(params?.page && { page: String(params.page) }),
       ...(params?.limit && { limit: String(params.limit) }),
+      ...(params?.offerFilter && { offerFilter: params.offerFilter }),
+      ...(params?.sortBy && { sortBy: params.sortBy }),
+      ...(params?.sortDirection && { sortDirection: params.sortDirection }),
     });
     return fetchAPI<ZohoAttributionListResponse>(`/api/zoho/attributions?${searchParams}`);
   },
@@ -365,6 +376,7 @@ export interface ZohoLookupResult {
       deal?: string;
       payment?: string;
     };
+    offerAmount?: number;
     dealAmount?: number;
     paymentAmount?: number;
   };
@@ -390,6 +402,7 @@ export interface ZohoAttribution {
     campaign_id: string;
     attributed_spend_usd: number;
     funnel_stage: string;
+    offer_amount: number | null;
     deal_amount: number | null;
     payment_amount: number | null;
     roas: number | null;
@@ -418,6 +431,7 @@ export interface ZohoCostResult {
   attributedSpend?: number;
   currency?: string;
   funnelStage?: string;
+  offerAmount?: number;
   dealAmount?: number;
   paymentAmount?: number;
   roas?: number;
@@ -436,6 +450,7 @@ export interface ZohoAttributionItem {
   formName: string | null;
   funnelStage: string;
   attributedSpend: number;
+  offerAmount: number | null;
   dealAmount: number | null;
   paymentAmount: number | null;
   roas: number | null;
