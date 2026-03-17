@@ -37,6 +37,95 @@ export const api = {
     return fetchAPI<DashboardStats>(`/api/dashboard?${searchParams}`);
   },
 
+  getDashboardStatsV2: (params: DashboardV2Params) => {
+    const searchParams = new URLSearchParams({
+      ...(params.startDate && { startDate: params.startDate }),
+      ...(params.endDate && { endDate: params.endDate }),
+      ...(params.accountId && { accountId: params.accountId }),
+      ...(params.objective && { objective: params.objective }),
+      ...(params.country && { country: params.country }),
+      ...(params.service && { service: params.service }),
+      ...(params.campaign && { campaign: params.campaign }),
+      ...(params.language && { language: params.language }),
+    });
+    return fetchAPI<DashboardStatsV2>(`/api/dashboard/v2?${searchParams}`);
+  },
+
+  getCohortRevenue: (params?: { startDate?: string; endDate?: string; accountId?: string }) => {
+    const searchParams = new URLSearchParams({
+      ...(params?.startDate && { startDate: params.startDate }),
+      ...(params?.endDate && { endDate: params.endDate }),
+      ...(params?.accountId && { accountId: params.accountId }),
+    });
+    return fetchAPI<CohortSummary>(`/api/dashboard/cohort-revenue?${searchParams}`);
+  },
+
+  getLeadTrend: (params?: { startDate?: string; endDate?: string; accountId?: string; granularity?: 'day' | 'week' | 'month' }) => {
+    const searchParams = new URLSearchParams({
+      ...(params?.startDate && { startDate: params.startDate }),
+      ...(params?.endDate && { endDate: params.endDate }),
+      ...(params?.accountId && { accountId: params.accountId }),
+      ...(params?.granularity && { granularity: params.granularity }),
+    });
+    return fetchAPI<LeadTrendData[]>(`/api/dashboard/lead-trend?${searchParams}`);
+  },
+
+  getSpendVsRevenue: (params?: { startDate?: string; endDate?: string; accountId?: string }) => {
+    const searchParams = new URLSearchParams({
+      ...(params?.startDate && { startDate: params.startDate }),
+      ...(params?.endDate && { endDate: params.endDate }),
+      ...(params?.accountId && { accountId: params.accountId }),
+    });
+    return fetchAPI<SpendVsRevenueData[]>(`/api/dashboard/spend-vs-revenue?${searchParams}`);
+  },
+
+  getRevenueByDealDate: (params?: { startDate?: string; endDate?: string; accountId?: string }) => {
+    const searchParams = new URLSearchParams({
+      ...(params?.startDate && { startDate: params.startDate }),
+      ...(params?.endDate && { endDate: params.endDate }),
+      ...(params?.accountId && { accountId: params.accountId }),
+    });
+    return fetchAPI<RevenueByDealDateData[]>(`/api/dashboard/revenue-by-deal-date?${searchParams}`);
+  },
+
+  getCampaignPerformance: (params?: { startDate?: string; endDate?: string; accountId?: string; limit?: number }) => {
+    const searchParams = new URLSearchParams({
+      ...(params?.startDate && { startDate: params.startDate }),
+      ...(params?.endDate && { endDate: params.endDate }),
+      ...(params?.accountId && { accountId: params.accountId }),
+      ...(params?.limit && { limit: String(params.limit) }),
+    });
+    return fetchAPI<CampaignPerformance[]>(`/api/dashboard/campaign-performance?${searchParams}`);
+  },
+
+  getServicePerformance: (params?: { startDate?: string; endDate?: string; accountId?: string }) => {
+    const searchParams = new URLSearchParams({
+      ...(params?.startDate && { startDate: params.startDate }),
+      ...(params?.endDate && { endDate: params.endDate }),
+      ...(params?.accountId && { accountId: params.accountId }),
+    });
+    return fetchAPI<ServicePerformance[]>(`/api/dashboard/service-performance?${searchParams}`);
+  },
+
+  getCreativePerformance: (params?: { startDate?: string; endDate?: string; accountId?: string; limit?: number }) => {
+    const searchParams = new URLSearchParams({
+      ...(params?.startDate && { startDate: params.startDate }),
+      ...(params?.endDate && { endDate: params.endDate }),
+      ...(params?.accountId && { accountId: params.accountId }),
+      ...(params?.limit && { limit: String(params.limit) }),
+    });
+    return fetchAPI<CreativePerformance[]>(`/api/dashboard/creative-performance?${searchParams}`);
+  },
+
+  getFunnelSnapshot: (params?: { startDate?: string; endDate?: string; accountId?: string }) => {
+    const searchParams = new URLSearchParams({
+      ...(params?.startDate && { startDate: params.startDate }),
+      ...(params?.endDate && { endDate: params.endDate }),
+      ...(params?.accountId && { accountId: params.accountId }),
+    });
+    return fetchAPI<FunnelSnapshot>(`/api/dashboard/funnel-snapshot?${searchParams}`);
+  },
+
   getCampaigns: (params: {
     startDate?: string;
     endDate?: string;
@@ -197,6 +286,110 @@ export interface DashboardStats {
   totalLeads: number;
   lastSpendSync: string | null;
   lastLeadsSync: string | null;
+}
+
+export interface DashboardV2Params {
+  startDate?: string;
+  endDate?: string;
+  accountId?: string;
+  objective?: string;
+  country?: string;
+  service?: string;
+  campaign?: string;
+  language?: string;
+}
+
+export interface DashboardStatsV2 {
+  spend: number;
+  leads: number;
+  cpl: number;
+  deals: number;
+  revenue: number;
+  roas: number;
+  leadToDealRate: number;
+  costPerDeal: number;
+  avgOfferAmount: number;
+  avgDealAmount: number;
+  lastSpendSync: string | null;
+  lastLeadsSync: string | null;
+}
+
+export interface CohortData {
+  cohortMonth: string;
+  monthsData: {
+    month: number;
+    revenue: number;
+    cumulativeRevenue: number;
+  }[];
+}
+
+export interface CohortSummary {
+  cohorts: CohortData[];
+  maxMonths: number;
+}
+
+export interface LeadTrendData {
+  date: string;
+  leads: number;
+}
+
+export interface SpendVsRevenueData {
+  month: string;
+  spend: number;
+  leads: number;
+  revenue: number;
+}
+
+export interface RevenueByDealDateData {
+  month: string;
+  revenue: number;
+  dealCount: number;
+}
+
+export interface CampaignPerformance {
+  campaignId: string;
+  campaignName: string;
+  spend: number;
+  leads: number;
+  deals: number;
+  leadToDealRate: number;
+  revenue: number;
+  roas: number;
+}
+
+export interface ServicePerformance {
+  service: string;
+  leads: number;
+  deals: number;
+  leadToDealRate: number;
+  revenue: number;
+  roas: number;
+  spend: number;
+}
+
+export interface CreativePerformance {
+  adName: string;
+  leads: number;
+  deals: number;
+  revenue: number;
+}
+
+export interface FunnelStageData {
+  stage: string;
+  count: number;
+  cost: number;
+}
+
+export interface FunnelSnapshot {
+  stages: FunnelStageData[];
+  conversionRates: {
+    leadToContact: number;
+    contactToOffer: number;
+    offerToDeal: number;
+    dealToRealization: number;
+  };
+  totalSpend: number;
+  totalLeads: number;
 }
 
 export interface Campaign {
