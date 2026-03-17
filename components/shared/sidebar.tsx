@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, Bell, Link2, ListFilter, GitMerge, DollarSign, BarChart3 } from "lucide-react";
+import { LayoutDashboard, Users, Bell, Link2, ListFilter, GitMerge, DollarSign, BarChart3, Database } from "lucide-react";
 
 const navigation = [
   { name: "Overview", href: "/overview", icon: BarChart3 },
   { name: "Campaigns", href: "/", icon: LayoutDashboard },
   { name: "Leads", href: "/leads-center", icon: ListFilter },
+  { name: "All Data", href: "/all-data", icon: Database },
   { name: "Incoming Leads", href: "/leads", icon: Users },
   { name: "Zoho Attribution", href: "/zoho-attribution", icon: DollarSign },
   { name: "Subscriptions", href: "/subscriptions", icon: Bell },

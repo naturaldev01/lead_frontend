@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { format, subDays } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +25,7 @@ import {
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
 import { LeadDetailsModal } from "@/components/leads/lead-details-modal";
 import { api, Lead, LeadDetails, AdAccount } from "@/lib/api";
-import { initCityCountryData, getCountryByCitySync } from "@/lib/city-country";
+import { initCityCountryData, getCountryByCitySync, isCityCountryDataLoaded } from "@/lib/city-country";
 import {
   RefreshCw,
   Eye,
@@ -47,6 +47,17 @@ type SortField = "createdAt" | "adAccountName" | "campaignName" | "formName";
 type SortOrder = "asc" | "desc";
 
 import { LeadFieldData } from "@/lib/api";
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 function getFieldByMappedName(
   fieldData: LeadFieldData[] | undefined,
@@ -168,17 +179,28 @@ export default function LeadsCenterPage() {
 
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
-  const [cityCountryReady, setCityCountryReady] = useState(false);
+  const [cityCountryReady, setCityCountryReady] = useState(isCityCountryDataLoaded());
+  const [showFieldColumns, setShowFieldColumns] = useState(false);
+  
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+  const debouncedFormNameFilter = useDebounce(formNameFilter, 300);
+  const debouncedCampaignIdFilter = useDebounce(campaignIdFilter, 300);
+
+  const initialFetchDone = useRef(false);
 
   useEffect(() => {
     api.getAdAccounts().then(setAdAccounts).catch(console.error);
-    // Initialize city-country lookup data and wait for it
-    initCityCountryData().then(() => {
-      setCityCountryReady(true);
-    });
   }, []);
 
-  const fetchLeads = useCallback(async () => {
+  useEffect(() => {
+    if (initialFetchDone.current && !cityCountryReady) {
+      initCityCountryData().then(() => {
+        setCityCountryReady(true);
+      });
+    }
+  }, [cityCountryReady]);
+
+  const fetchLeads = useCallback(async (includeFields = false) => {
     if (!isAllTime && (!dateRange?.from || !dateRange?.to)) return;
 
     setLoading(true);
@@ -190,16 +212,17 @@ export default function LeadsCenterPage() {
         startDate,
         endDate,
         accountId: accountFilter !== "all" ? accountFilter : undefined,
-        campaignId: campaignIdFilter || undefined,
-        formName: formNameFilter || undefined,
-        search: searchQuery || undefined,
+        campaignId: debouncedCampaignIdFilter || undefined,
+        formName: debouncedFormNameFilter || undefined,
+        search: debouncedSearchQuery || undefined,
         page,
         limit,
-        includeFieldData: true,
+        includeFieldData: includeFields || showFieldColumns,
       });
 
       setLeads(response.data);
       setTotalLeads(response.total);
+      initialFetchDone.current = true;
     } catch (error) {
       console.error("Failed to fetch leads:", error);
     } finally {
@@ -209,11 +232,12 @@ export default function LeadsCenterPage() {
     dateRange,
     isAllTime,
     accountFilter,
-    campaignIdFilter,
-    formNameFilter,
-    searchQuery,
+    debouncedCampaignIdFilter,
+    debouncedFormNameFilter,
+    debouncedSearchQuery,
     page,
     limit,
+    showFieldColumns,
   ]);
 
   useEffect(() => {
@@ -222,7 +246,15 @@ export default function LeadsCenterPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [accountFilter, campaignIdFilter, formNameFilter, searchQuery, dateRange, isAllTime]);
+  }, [accountFilter, debouncedCampaignIdFilter, debouncedFormNameFilter, debouncedSearchQuery, dateRange, isAllTime]);
+
+  const handleToggleFieldColumns = useCallback(() => {
+    const newValue = !showFieldColumns;
+    setShowFieldColumns(newValue);
+    if (newValue && leads.length > 0 && !leads[0].fieldData) {
+      fetchLeads(true);
+    }
+  }, [showFieldColumns, leads, fetchLeads]);
 
   const sortedLeads = useMemo(() => {
     const sorted = [...leads];
@@ -324,7 +356,7 @@ export default function LeadsCenterPage() {
             Kompakt lead listesi ve gelişmiş filtreleme
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchLeads}>
+        <Button variant="outline" size="sm" onClick={() => fetchLeads()}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Yenile
         </Button>
@@ -403,22 +435,33 @@ export default function LeadsCenterPage() {
               {totalLeads.toLocaleString("tr-TR")} kayıt
             </Badge>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Sayfa başına:</span>
-            <Select
-              value={String(limit)}
-              onValueChange={(v) => setLimit(Number(v))}
+          <div className="flex items-center gap-4">
+            <Button
+              variant={showFieldColumns ? "default" : "outline"}
+              size="sm"
+              className="h-7 text-xs"
+              onClick={handleToggleFieldColumns}
             >
-              <SelectTrigger className="h-7 w-16 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="25">25</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-              </SelectContent>
-            </Select>
+              <User className="h-3 w-3 mr-1" />
+              Detay Sütunları {showFieldColumns ? "Gizle" : "Göster"}
+            </Button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Sayfa başına:</span>
+              <Select
+                value={String(limit)}
+                onValueChange={(v) => setLimit(Number(v))}
+              >
+                <SelectTrigger className="h-7 w-16 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -435,36 +478,40 @@ export default function LeadsCenterPage() {
                       <SortIcon field="createdAt" />
                     </span>
                   </TableHead>
-                  <TableHead className="text-xs font-semibold">
-                    <span className="flex items-center gap-1">
-                      <User className="h-3 w-3" />
-                      Ad Soyad
-                    </span>
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold">
-                    <span className="flex items-center gap-1">
-                      <Mail className="h-3 w-3" />
-                      E-posta
-                    </span>
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold">
-                    <span className="flex items-center gap-1">
-                      <Phone className="h-3 w-3" />
-                      Telefon
-                    </span>
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold">
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      Şehir
-                    </span>
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold">
-                    <span className="flex items-center gap-1">
-                      <Globe className="h-3 w-3" />
-                      Ülke
-                    </span>
-                  </TableHead>
+                  {showFieldColumns && (
+                    <>
+                      <TableHead className="text-xs font-semibold">
+                        <span className="flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          Ad Soyad
+                        </span>
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold">
+                        <span className="flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          E-posta
+                        </span>
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold">
+                        <span className="flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          Telefon
+                        </span>
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold">
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          Şehir
+                        </span>
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold">
+                        <span className="flex items-center gap-1">
+                          <Globe className="h-3 w-3" />
+                          Ülke
+                        </span>
+                      </TableHead>
+                    </>
+                  )}
                   <TableHead
                     className="cursor-pointer select-none text-xs font-semibold"
                     onClick={() => handleSort("formName")}
@@ -490,14 +537,14 @@ export default function LeadsCenterPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8">
+                    <TableCell colSpan={showFieldColumns ? 10 : 5} className="text-center py-8">
                       <RefreshCw className="h-5 w-5 animate-spin mx-auto text-gray-400" />
                     </TableCell>
                   </TableRow>
                 ) : sortedLeads.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={10}
+                      colSpan={showFieldColumns ? 10 : 5}
                       className="text-center py-8 text-gray-500 text-sm"
                     >
                       Lead bulunamadı
@@ -505,11 +552,11 @@ export default function LeadsCenterPage() {
                   </TableRow>
                 ) : (
                   sortedLeads.map((lead) => {
-                    const displayName = getFullName(lead.fieldData) || "-";
-                    const email = getEmail(lead.fieldData);
-                    const phone = getPhone(lead.fieldData);
-                    const city = getCity(lead.fieldData);
-                    const country = getCountry(lead.fieldData, city);
+                    const displayName = showFieldColumns ? (getFullName(lead.fieldData) || "-") : null;
+                    const email = showFieldColumns ? getEmail(lead.fieldData) : null;
+                    const phone = showFieldColumns ? getPhone(lead.fieldData) : null;
+                    const city = showFieldColumns ? getCity(lead.fieldData) : null;
+                    const country = showFieldColumns ? getCountry(lead.fieldData, city || undefined) : null;
 
                     return (
                       <TableRow
@@ -525,21 +572,25 @@ export default function LeadsCenterPage() {
                             minute: "2-digit",
                           })}
                         </TableCell>
-                        <TableCell className="text-xs py-2 max-w-[140px] truncate font-medium">
-                          {displayName}
-                        </TableCell>
-                        <TableCell className="text-xs py-2 max-w-[180px] truncate text-blue-600 dark:text-blue-400">
-                          {email || "-"}
-                        </TableCell>
-                        <TableCell className="text-xs py-2 max-w-[120px] truncate">
-                          {phone || "-"}
-                        </TableCell>
-                        <TableCell className="text-xs py-2 max-w-[100px] truncate text-gray-600 dark:text-gray-400">
-                          {city || "-"}
-                        </TableCell>
-                        <TableCell className="text-xs py-2 max-w-[100px] truncate text-gray-600 dark:text-gray-400">
-                          {country || "-"}
-                        </TableCell>
+                        {showFieldColumns && (
+                          <>
+                            <TableCell className="text-xs py-2 max-w-[140px] truncate font-medium">
+                              {displayName}
+                            </TableCell>
+                            <TableCell className="text-xs py-2 max-w-[180px] truncate text-blue-600 dark:text-blue-400">
+                              {email || "-"}
+                            </TableCell>
+                            <TableCell className="text-xs py-2 max-w-[120px] truncate">
+                              {phone || "-"}
+                            </TableCell>
+                            <TableCell className="text-xs py-2 max-w-[100px] truncate text-gray-600 dark:text-gray-400">
+                              {city || "-"}
+                            </TableCell>
+                            <TableCell className="text-xs py-2 max-w-[100px] truncate text-gray-600 dark:text-gray-400">
+                              {country || "-"}
+                            </TableCell>
+                          </>
+                        )}
                         <TableCell className="text-xs py-2 max-w-[120px] truncate">
                           {lead.formName}
                         </TableCell>

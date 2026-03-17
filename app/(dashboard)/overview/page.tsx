@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
 import { format, subDays } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { RefreshCw, Circle } from "lucide-react";
@@ -12,7 +12,6 @@ import { FunnelSnapshot } from "@/components/dashboard/funnel-snapshot";
 import {
   SpendVsRevenueChart,
   LeadTrendChart,
-  CohortRevenueChart,
   RevenueByDealDateChart,
 } from "@/components/dashboard/charts";
 import {
@@ -22,16 +21,21 @@ import {
 } from "@/components/dashboard/performance-tables";
 import {
   api,
+  invalidateDashboardCache,
   DashboardStatsV2,
   SpendVsRevenueData,
   LeadTrendData,
-  CohortSummary,
   RevenueByDealDateData,
   CampaignPerformance,
   ServicePerformance,
   CreativePerformance,
   FunnelSnapshot as FunnelSnapshotType,
 } from "@/lib/api";
+import { logDashboardMetrics } from "@/lib/perf-timing";
+
+const CohortRevenueChart = lazy(() => 
+  import("@/components/dashboard/charts/cohort-revenue-chart").then(mod => ({ default: mod.CohortRevenueChart }))
+);
 
 export default function OverviewPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -51,7 +55,6 @@ export default function OverviewPage() {
   const [stats, setStats] = useState<DashboardStatsV2 | null>(null);
   const [spendVsRevenue, setSpendVsRevenue] = useState<SpendVsRevenueData[]>([]);
   const [leadTrend, setLeadTrend] = useState<LeadTrendData[]>([]);
-  const [cohortData, setCohortData] = useState<CohortSummary | null>(null);
   const [revenueByDealDate, setRevenueByDealDate] = useState<RevenueByDealDateData[]>([]);
   const [campaignPerformance, setCampaignPerformance] = useState<CampaignPerformance[]>([]);
   const [servicePerformance, setServicePerformance] = useState<ServicePerformance[]>([]);
@@ -63,41 +66,38 @@ export default function OverviewPage() {
     leads: "-",
   });
 
+  const filterParams = useMemo(() => {
+    const startDate = isAllTime ? undefined : (dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined);
+    const endDate = isAllTime ? undefined : (dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined);
+    const accountId = accountFilter !== "all" ? accountFilter : undefined;
+    const country = countryFilter !== "all" ? countryFilter : undefined;
+    const service = serviceFilter !== "all" ? serviceFilter : undefined;
+    const language = languageFilter !== "all" ? languageFilter : undefined;
+    return { startDate, endDate, accountId, country, service, language };
+  }, [dateRange, isAllTime, accountFilter, countryFilter, serviceFilter, languageFilter]);
+
   const fetchData = useCallback(async () => {
     if (!isAllTime && (!dateRange?.from || !dateRange?.to)) return;
 
     setLoading(true);
+    const totalStart = performance.now();
 
     try {
-      const startDate = isAllTime ? undefined : format(dateRange!.from!, "yyyy-MM-dd");
-      const endDate = isAllTime ? undefined : format(dateRange!.to!, "yyyy-MM-dd");
-      const accountId = accountFilter !== "all" ? accountFilter : undefined;
-      const country = countryFilter !== "all" ? countryFilter : undefined;
-      const service = serviceFilter !== "all" ? serviceFilter : undefined;
-      const language = languageFilter !== "all" ? languageFilter : undefined;
+      const { startDate, endDate, accountId, country, service, language } = filterParams;
 
       const [
         statsData,
         spendVsRevenueData,
         leadTrendData,
-        cohortRevenueData,
         revenueByDealDateData,
         campaignPerformanceData,
         servicePerformanceData,
         creativePerformanceData,
         funnelSnapshotData,
       ] = await Promise.all([
-        api.getDashboardStatsV2({
-          startDate,
-          endDate,
-          accountId,
-          country,
-          service,
-          language,
-        }),
+        api.getDashboardStatsV2({ startDate, endDate, accountId, country, service, language }),
         api.getSpendVsRevenue({ startDate, endDate, accountId }),
         api.getLeadTrend({ startDate, endDate, accountId, granularity: "month" }),
-        api.getCohortRevenue({ startDate, endDate, accountId }),
         api.getRevenueByDealDate({ startDate, endDate, accountId }),
         api.getCampaignPerformance({ startDate, endDate, accountId, limit: 10 }),
         api.getServicePerformance({ startDate, endDate, accountId }),
@@ -108,7 +108,6 @@ export default function OverviewPage() {
       setStats(statsData);
       setSpendVsRevenue(spendVsRevenueData);
       setLeadTrend(leadTrendData);
-      setCohortData(cohortRevenueData);
       setRevenueByDealDate(revenueByDealDateData);
       setCampaignPerformance(campaignPerformanceData);
       setServicePerformance(servicePerformanceData);
@@ -116,23 +115,20 @@ export default function OverviewPage() {
       setFunnelSnapshot(funnelSnapshotData);
 
       if (statsData.lastSpendSync) {
-        setLastSyncTime((prev) => ({
-          ...prev,
-          spend: formatRelativeTime(statsData.lastSpendSync),
-        }));
+        setLastSyncTime((prev) => ({ ...prev, spend: formatRelativeTime(statsData.lastSpendSync) }));
       }
       if (statsData.lastLeadsSync) {
-        setLastSyncTime((prev) => ({
-          ...prev,
-          leads: formatRelativeTime(statsData.lastLeadsSync),
-        }));
+        setLastSyncTime((prev) => ({ ...prev, leads: formatRelativeTime(statsData.lastLeadsSync) }));
       }
+
+      const totalTime = performance.now() - totalStart;
+      logDashboardMetrics({ totalTime, chartsTime: totalTime, tablesTime: 0 });
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
     } finally {
       setLoading(false);
     }
-  }, [dateRange, isAllTime, accountFilter, countryFilter, serviceFilter, languageFilter]);
+  }, [dateRange, isAllTime, filterParams]);
 
   useEffect(() => {
     api.getAvailableCountries()
@@ -147,6 +143,7 @@ export default function OverviewPage() {
   const handleSync = useCallback(async () => {
     setSyncing(true);
     try {
+      invalidateDashboardCache();
       await api.syncMeta();
       await fetchData();
       setLastSyncTime({
@@ -214,11 +211,13 @@ export default function OverviewPage() {
         <RevenueByDealDateChart data={revenueByDealDate} loading={loading} />
       </div>
 
-      {/* Charts Row 2: Lead Trend + Cohort Revenue */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <LeadTrendChart data={leadTrend} loading={loading} />
-        <CohortRevenueChart data={cohortData} loading={loading} />
-      </div>
+      {/* Lead Trend Chart */}
+      <LeadTrendChart data={leadTrend} loading={loading} />
+
+      {/* Cohort Revenue Table - Full Width with Independent Filters (lazy loaded) */}
+      <Suspense fallback={<div className="h-[400px] flex items-center justify-center text-gray-500">Loading cohort data...</div>}>
+        <CohortRevenueChart accountId={accountFilter !== "all" ? accountFilter : undefined} />
+      </Suspense>
 
       {/* Funnel Snapshot */}
       <FunnelSnapshot data={funnelSnapshot} loading={loading} />

@@ -1,23 +1,124 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const requestCache = new Map<string, CacheEntry<unknown>>();
+const inflightRequests = new Map<string, Promise<unknown>>();
+
+const DEFAULT_CACHE_TTL_MS = 60_000;
+const STALE_WHILE_REVALIDATE_MS = 120_000;
+
+function getCacheKey(endpoint: string, options: RequestInit): string {
+  const method = options.method || "GET";
+  const body = options.body ? String(options.body) : "";
+  return `${method}:${endpoint}:${body}`;
+}
+
+function cleanExpiredCache(): void {
+  const now = Date.now();
+  for (const [key, entry] of requestCache.entries()) {
+    if (now - entry.timestamp > DEFAULT_CACHE_TTL_MS * 2) {
+      requestCache.delete(key);
+    }
+  }
+}
+
+setInterval(cleanExpiredCache, 60_000);
 
 async function fetchAPI<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  cacheTtlMs: number = DEFAULT_CACHE_TTL_MS
 ): Promise<T> {
-  const res = await fetch(`${API_URL}${endpoint}`, {
+  const cacheKey = getCacheKey(endpoint, options);
+  const method = options.method || "GET";
+  const isCacheable = method === "GET" && cacheTtlMs > 0;
+
+  if (isCacheable) {
+    const cached = requestCache.get(cacheKey) as CacheEntry<T> | undefined;
+    const now = Date.now();
+    
+    if (cached) {
+      const age = now - cached.timestamp;
+      
+      if (age < cacheTtlMs) {
+        return cached.data;
+      }
+      
+      if (age < STALE_WHILE_REVALIDATE_MS) {
+        revalidateInBackground(endpoint, options, cacheKey);
+        return cached.data;
+      }
+    }
+
+    const inflight = inflightRequests.get(cacheKey) as Promise<T> | undefined;
+    if (inflight) {
+      return inflight;
+    }
+  }
+
+  const request = (async () => {
+    const res = await fetch(`${API_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    });
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ message: "API Error" }));
+      throw new Error(error.message || "API Error");
+    }
+
+    const data = await res.json() as T;
+
+    if (isCacheable) {
+      requestCache.set(cacheKey, { data, timestamp: Date.now() });
+    }
+
+    return data;
+  })();
+
+  if (isCacheable) {
+    inflightRequests.set(cacheKey, request);
+    request.finally(() => inflightRequests.delete(cacheKey));
+  }
+
+  return request;
+}
+
+function revalidateInBackground(endpoint: string, options: RequestInit, cacheKey: string): void {
+  if (inflightRequests.has(cacheKey)) return;
+  
+  const revalidate = fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
       ...options.headers,
     },
-  });
+  })
+    .then(res => res.ok ? res.json() : null)
+    .then(data => {
+      if (data) {
+        requestCache.set(cacheKey, { data, timestamp: Date.now() });
+      }
+    })
+    .catch(() => {});
+  
+  inflightRequests.set(cacheKey, revalidate);
+  revalidate.finally(() => inflightRequests.delete(cacheKey));
+}
 
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ message: "API Error" }));
-    throw new Error(error.message || "API Error");
+export function invalidateDashboardCache(): void {
+  for (const key of requestCache.keys()) {
+    if (key.includes("/api/dashboard")) {
+      requestCache.delete(key);
+    }
   }
-
-  return res.json();
 }
 
 export const api = {
@@ -51,11 +152,21 @@ export const api = {
     return fetchAPI<DashboardStatsV2>(`/api/dashboard/v2?${searchParams}`);
   },
 
-  getCohortRevenue: (params?: { startDate?: string; endDate?: string; accountId?: string }) => {
+  getCohortRevenue: (params?: { 
+    startDate?: string; 
+    endDate?: string; 
+    accountId?: string;
+    cohortStartDate?: string;
+    cohortEndDate?: string;
+    maxMonths?: number;
+  }) => {
     const searchParams = new URLSearchParams({
       ...(params?.startDate && { startDate: params.startDate }),
       ...(params?.endDate && { endDate: params.endDate }),
       ...(params?.accountId && { accountId: params.accountId }),
+      ...(params?.cohortStartDate && { cohortStartDate: params.cohortStartDate }),
+      ...(params?.cohortEndDate && { cohortEndDate: params.cohortEndDate }),
+      ...(params?.maxMonths && { maxMonths: String(params.maxMonths) }),
     });
     return fetchAPI<CohortSummary>(`/api/dashboard/cohort-revenue?${searchParams}`);
   },
@@ -188,6 +299,28 @@ export const api = {
   syncLead: (leadId: string) =>
     fetchAPI<{ success: boolean }>(`/api/leads/${leadId}/sync`, { method: "POST" }),
 
+  getLeadProfiles: (params?: {
+    search?: string;
+    country?: string;
+    source?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const searchParams = new URLSearchParams({
+      ...(params?.search && { search: params.search }),
+      ...(params?.country && { country: params.country }),
+      ...(params?.source && { source: params.source }),
+      ...(params?.status && { status: params.status }),
+      page: String(params?.page || 1),
+      limit: String(params?.limit || 50),
+    });
+    return fetchAPI<LeadProfilesResponse>(`/api/leads/profiles?${searchParams}`);
+  },
+
+  getLeadProfilesFilterOptions: () =>
+    fetchAPI<LeadProfilesFilterOptions>("/api/leads/profiles/filters"),
+
   // Subscriptions
   getSubscriptions: () => fetchAPI<Subscription[]>("/api/subscriptions"),
 
@@ -316,6 +449,7 @@ export interface DashboardStatsV2 {
 
 export interface CohortData {
   cohortMonth: string;
+  leadCount: number;
   monthsData: {
     month: number;
     revenue: number;
@@ -469,6 +603,44 @@ export interface LeadsResponse {
   total: number;
   page: number;
   limit: number;
+}
+
+export interface LeadProfile {
+  leadUuid: string;
+  metaLeadId: string;
+  adAccountId: string | null;
+  campaignId: string | null;
+  source: string;
+  formName: string;
+  fullName: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  city: string;
+  country: string;
+  status: string;
+  dealAmount: number | null;
+  offerAmount: number | null;
+  paymentAmount: number | null;
+  comments: string;
+  dateOfBirth: string | null;
+  createdTime: string;
+  insertedAt: string | null;
+  updatedAt: string;
+}
+
+export interface LeadProfilesResponse {
+  data: LeadProfile[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface LeadProfilesFilterOptions {
+  countries: string[];
+  sources: string[];
+  statuses: string[];
 }
 
 export interface Subscription {
